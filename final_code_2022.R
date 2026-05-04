@@ -1471,103 +1471,21 @@ cat("\n--- Pooled regression results: Finland 2022 ---\n")
 print(reg_results_fin_22)
 
 # ==============================================================================
-# 12. Pooled weighted means (point estimates for OBD)
+# 12. Pooled weighted means with standard errors and significance
 # ==============================================================================
 
-# For the Oaxaca–Blinder decomposition, only pooled point estimates of the
-# predictor and outcome means are required as inputs. Means are computed under
-# the BRR design for each of the 200 datasets and then averaged. Variance and
-# inference for the means are computed separately in Section 13.
-
-compute_pooled_means_22 <- function(imp_datasets, cont_preds, label) {
-  
-  cat("\n--- Computing weighted means:", label, "---\n")
-  
-  all_means <- list()
-  
-  for (i in seq_along(imp_datasets)) {
-    for (j in seq_along(imp_datasets[[i]])) {
-      
-      dat    <- imp_datasets[[i]][[j]]
-      design <- make_brr_design_22(dat)
-      
-      cont_means <- as.numeric(
-        svymean(as.formula(paste("~",
-                                 paste(cont_preds, collapse = " + "))),
-                design, na.rm = TRUE)
-      )
-      names(cont_means) <- cont_preds
-      
-      # Use names returned by svymean to avoid mislabelling
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      langn_mean <- as.numeric(langn_obj)
-      names(langn_mean) <- names(coef(langn_obj))
-      
-      outcome_mean <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
-      names(outcome_mean) <- "PV_MATH"
-      
-      all_means[[length(all_means) + 1]] <-
-        c(cont_means, langn_mean, outcome_mean)
-    }
-    cat("  PV", i, "complete\n")
-  }
-  
-  means_mat    <- do.call(rbind, all_means)
-  pooled_means <- colMeans(means_mat, na.rm = TRUE)
-  
-  cat("Means computed —", label, "\n")
-  pooled_means
-}
-
-pooled_means_nor_22 <- compute_pooled_means_22(
-  imp_datasets_nor_22, final_cont_preds_22, "Norway 2022"
-)
-
-pooled_means_fin_22 <- compute_pooled_means_22(
-  imp_datasets_fin_22, final_cont_preds_22, "Finland 2022"
-)
-
-# Verify names are aligned before building table
-stopifnot(identical(names(pooled_means_nor_22), names(pooled_means_fin_22)))
-
-cat("\n--- Pooled weighted means: Norway 2022 ---\n")
-print(round(pooled_means_nor_22, 4))
-
-cat("\n--- Pooled weighted means: Finland 2022 ---\n")
-print(round(pooled_means_fin_22, 4))
-
-means_table_22 <- data.frame(
-  variable           = names(pooled_means_nor_22),
-  mean_NOR           = round(pooled_means_nor_22, 4),
-  mean_FIN           = round(pooled_means_fin_22, 4),
-  diff_NOR_minus_FIN = round(pooled_means_nor_22 - pooled_means_fin_22, 4),
-  row.names          = NULL
-)
-
-cat("\n--- Means comparison table: 2022 ---\n")
-print(means_table_22)
-
-# Export for use in the Excel-based OBD calculation
-write.csv(reg_results_22,  "reg_results_2022.csv",  row.names = FALSE)
-write.csv(means_table_22,  "means_table_2022.csv",  row.names = FALSE)
-
-cat("\n--- Files saved ---\n")
-cat("reg_results_2022.csv\n")
-cat("means_table_2022.csv\n")
-
-# ==============================================================================
-# 13. Pooled means with standard errors (for cross-cycle inference)
-# ==============================================================================
-
-# Required to test whether the within-country shift in any predictor's mean
-# from 2012 to 2022 (X_22 - X_12) is statistically significant. Pooling
-# structure mirrors that used for the regression coefficients in Section 11:
+# Pooling structure mirrors the regression analysis in Section 11:
 #   Stage 1 — Rubin's rules within each PV, using BRR design-based SEs.
 #   Stage 2 — PV combination rules across the Q pooled per-PV estimates.
 
-compute_pooled_means_with_se <- function(imp_datasets, cont_preds, label) {
+# ------------------------------------------------------------------------------
+# 12.1  Compute pooled means with SEs and against-zero significance
+# ------------------------------------------------------------------------------
+
+compute_pooled_means_22 <- function(imp_datasets, cont_preds,
+                                    country_label, cycle_label = 2022) {
   
-  cat("\n--- Computing pooled means with SEs:", label, "---\n")
+  cat("\n--- Computing pooled means with SEs:", country_label, cycle_label, "---\n")
   
   Q <- length(imp_datasets)
   m <- length(imp_datasets[[1]])
@@ -1579,62 +1497,53 @@ compute_pooled_means_with_se <- function(imp_datasets, cont_preds, label) {
     
     # Storage: rows = imputations within this PV, columns = variables
     imp_means <- matrix(NA, nrow = m, ncol = length(cont_preds) + 3)
+    imp_ses   <- matrix(NA, nrow = m, ncol = length(cont_preds) + 3)
     
-    # First pass: collect point estimates from each imputation
     for (j in seq_len(m)) {
       dat    <- imp_datasets[[i]][[j]]
       design <- make_brr_design_22(dat)
       
-      cont_obj <- svymean(
+      cont_obj         <- svymean(
         as.formula(paste("~", paste(cont_preds, collapse = " + "))),
         design, na.rm = TRUE
       )
-      cont_est <- as.numeric(cont_obj)
-      names(cont_est) <- cont_preds
+      cont_est         <- as.numeric(cont_obj)
+      names(cont_est)  <- cont_preds
       
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      langn_est  <- as.numeric(langn_obj)
+      langn_obj        <- svymean(~ LANGN, design, na.rm = TRUE)
+      langn_est        <- as.numeric(langn_obj)
       names(langn_est) <- names(coef(langn_obj))
       
-      pv_est <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
-      names(pv_est) <- "PV_MATH"
+      pv_obj           <- svymean(~ PV_MATH, design, na.rm = TRUE)
+      pv_est           <- as.numeric(pv_obj)
+      names(pv_est)    <- "PV_MATH"
       
       imp_means[j, ] <- c(cont_est, langn_est, pv_est)
+      
+      imp_ses[j, seq_along(cont_preds)] <-
+        SE(cont_obj)
+      imp_ses[j, length(cont_preds) + seq_along(names(coef(langn_obj)))] <-
+        SE(langn_obj)
+      imp_ses[j, length(cont_preds) + length(names(coef(langn_obj))) + 1] <-
+        SE(pv_obj)
     }
     
     var_names <- c(cont_preds, names(coef(langn_obj)), "PV_MATH")
     colnames(imp_means) <- var_names
+    colnames(imp_ses)   <- var_names
     
-    # Stage 1: within-PV pooling via Rubin's rules
+    # Stage 1: pool m imputations within this PV via Rubin's rules
     pv_means_list[[i]] <- colMeans(imp_means)
     
-    # Second pass: collect BRR-based SEs from each imputation
-    imp_ses <- matrix(NA, nrow = m, ncol = length(var_names))
-    colnames(imp_ses) <- var_names
-    
-    for (j in seq_len(m)) {
-      dat    <- imp_datasets[[i]][[j]]
-      design <- make_brr_design_22(dat)
-      
-      cont_obj   <- svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))), design, na.rm = TRUE)
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      pv_obj     <- svymean(~ PV_MATH, design, na.rm = TRUE)
-      
-      imp_ses[j, cont_preds]              <- SE(cont_obj)
-      imp_ses[j, names(coef(langn_obj))]  <- SE(langn_obj)
-      imp_ses[j, "PV_MATH"]              <- SE(pv_obj)
-    }
-    
-    within_var <- colMeans(imp_ses^2)
+    within_var  <- colMeans(imp_ses^2)
     between_var <- apply(imp_means, 2, var)
-    total_var <- within_var + (1 + 1/m) * between_var
+    total_var   <- within_var + (1 + 1/m) * between_var
     
     pv_vars_list[[i]] <- total_var
-    
     cat("  PV", i, "complete\n")
   }
   
-  # Stage 2: combine across PVs
+  # Stage 2: combine across PVs via PV combination rules
   means_mat <- do.call(rbind, pv_means_list)
   vars_mat  <- do.call(rbind, pv_vars_list)
   
@@ -1644,29 +1553,40 @@ compute_pooled_means_with_se <- function(imp_datasets, cont_preds, label) {
   total_var   <- avg_pv_var + (1 + 1/Q) * between_var
   final_se    <- sqrt(total_var)
   
-  cat("Done —", label, "\n")
+  # Against-zero significance test (H0: mean = 0)
+  t_val <- final_means / final_se
+  p_val <- 2 * pnorm(-abs(t_val))
+  
+  cat("Done —", country_label, cycle_label, "\n")
   
   data.frame(
-    variable = names(final_means),
-    mean     = round(final_means, 4),
-    se       = round(final_se, 4),
-    row.names = NULL
+    cycle       = cycle_label,
+    country     = country_label,
+    variable    = names(final_means),
+    mean        = round(final_means, 4),
+    se          = round(final_se,    4),
+    t_value     = round(t_val,       3),
+    p_value     = signif(p_val,      3),
+    significant = ifelse(p_val < 0.05, "*", ""),
+    row.names   = NULL
   )
 }
 
-means_se_nor_22 <- compute_pooled_means_with_se(
-  imp_datasets_nor_22, final_cont_preds_22, "Norway 2022"
-)
-means_se_fin_22 <- compute_pooled_means_with_se(
-  imp_datasets_fin_22, final_cont_preds_22, "Finland 2022"
-)
+means_results_nor_22 <- compute_pooled_means_22(imp_datasets_nor_22,
+                                                final_cont_preds_22,
+                                                country_label = "NOR")
+means_results_fin_22 <- compute_pooled_means_22(imp_datasets_fin_22,
+                                                final_cont_preds_22,
+                                                country_label = "FIN")
 
-cat("\n--- Pooled means with SEs: Norway 2022 ---\n");  print(means_se_nor_22)
-cat("\n--- Pooled means with SEs: Finland 2022 ---\n"); print(means_se_fin_22)
+means_table_22 <- rbind(means_results_nor_22, means_results_fin_22)
 
-# Export
-write.csv(means_se_nor_22, "means_se_nor_2022.csv", row.names = FALSE)
-write.csv(means_se_fin_22, "means_se_fin_2022.csv", row.names = FALSE)
+# ------------------------------------------------------------------------------
+# 12.2  Export
+# ------------------------------------------------------------------------------
+
+write.csv(reg_results_22, "reg_results_2022.csv", row.names = FALSE)
+write.csv(means_table_22, "means_table_2022.csv", row.names = FALSE)
 
 # ==============================================================================
 # End of script
