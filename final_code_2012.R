@@ -1,59 +1,55 @@
 # ==============================================================================
-# Packages
+# MAE4191 MASTER'S THESIS PROJECT. PART 2 - PISA 2012 DATA ANALYSIS
 # ==============================================================================
 
-library(haven)    
-library(dplyr)      
-library(naniar)    
-library(survey)
-library(mitools)
-library(VIM)       
-library(mice)      
-library(gridExtra) 
-library(ggplot2)   
-library(mitools)   
-library(tidyverse)
-library(corrplot)  
-library(patchwork) 
-library(car)  
-library(DescTools)  
-library(EdSurvey)
-library(lsr)
+# ==============================================================================
+# 0. Packages and session info
+# ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Package citations & R version
-# ------------------------------------------------------------------------------
+library(haven)       # Read SPSS .sav files and handle labelled variables
+library(dplyr)       # Data manipulation
+library(tidyverse)   # Data manipulation extras (used in ESCS merge)
+library(survey)      # Complex-survey designs (BRR/Fay)
+library(mitools)     # MIcombine() for pooled estimates with Rubin's rules
+library(naniar)      # Little's MCAR test
+library(VIM)         # Missing-data visualisation utilities
+library(mice)        # Multiple Imputation by Chained Equations
+library(corrplot)    # Correlation matrix visualisation
+library(car)         # VIF calculations
+library(DescTools)   # Misc. descriptive utilities
+library(EdSurvey)    # Educational-survey utilities
+library(lsr)         # Effect-size helpers
+library(gridExtra)   # Multi-panel plotting
+library(ggplot2)     # Plotting
+library(patchwork)   # Plot composition
 
-packages <- c("haven", "dplyr", "naniar", "survey", "mitools", "VIM", "mice", "gridExtra", "ggplot2", "tidyverse", "corrplot", "patchwork", "car", "DescTools", "EdSurvey", "lsr")
-
+packages <- c("survey", "mice", "mitools")
 for (pkg in packages) {
   cat("\n===", pkg, "===\n")
   print(citation(pkg))
 }
-
-R.version.string
+R.version.string # R version 4.5.3
 
 # ==============================================================================
-# Load data 
+# 1. Load data
 # ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1.1  Load PISA 2012 Student Questionnaire
+# ------------------------------------------------------------------------------
 
 # Source: PISA 2012 Student Questionnaire Data (OECD)
 # Link: https://www.oecd.org/en/data/datasets/pisa-2012-database.html#data
-# Original data: TXT format, converted to .sav using official OECD SPSS 
-# control file (Syntax to read in student questionnaire data file)
+# Original data: TXT format, converted to .sav using OECD's official SPSS
+# control file (Syntax to read in student questionnaire data file).
+# Data dimensions: 480,174 observations x 634 variables
 
-# Set working directory
-# Not needed if I upload everything as an R project
-setwd("C:/Users/elly2/Desktop/thesis")
-
-# Load PISA 2012 Student Questionnaire data from SPSS file
-INT_STU12_DEC03 <- read_sav("INT_STU12_DEC03.sav", user_na = TRUE)
-
-# Save the original dataset as master copy
-MDATA_12_STU_QQQ <- INT_STU12_DEC03
+setwd("C:/Users/elly2/Desktop/thesis") # IMPORTANT! Change to local working directory
+INT_STU12_DEC03  <- read_sav("INT_STU12_DEC03.sav", user_na = TRUE)
+MDATA_12_STU_QQQ <- INT_STU12_DEC03 # Save the original dataset as master copy
 
 # ------------------------------------------------------------------------------
-# Merge rescaled ESCS for trend analysis
+# 1.2  Merge rescaled ESCS for cross-cycle trend analysis
 # ------------------------------------------------------------------------------
 
 # The rescaled ESCS file is downloaded separately from the OECD 2022 database:
@@ -66,17 +62,17 @@ cat("--- escs_trend file structure ---\n")
 head(escs_trend)
 names(escs_trend)
 
-# Filter to 2012 only
+# Filter to 2012 only (cycle == 5 in the trend file's coding)
 escs_2012 <- escs_trend %>%
   filter(cycle == 5) %>%
   select(cnt, schoolid, studentid, escs_trend)
 
-cat("Rows in escs_2012:", nrow(escs_2012), "\n")  # should be 453,304
+cat("Rows in escs_2012:", nrow(escs_2012), "\n")  # Expected: 453,304
 
-# Harmonise ID formats for merging:
-# escs file stores IDs as numeric (1, 2, 3...)
-# PISA 2012 file stores them as zero-padded character strings
-# ("0000001" for SCHOOLID, "00001" for StIDStd)
+# Harmonise ID formats for merging.
+# escs_trend stores IDs as numeric (1, 2, 3, ...).
+# PISA 2012 file stores IDs as zero-padded character strings:
+# SCHOOLID = 7 characters (e.g., "0000001"); StIDStd = 5 characters (e.g., "00001").
 
 escs_2012 <- escs_2012 %>%
   mutate(
@@ -86,70 +82,137 @@ escs_2012 <- escs_2012 %>%
   ) %>%
   select(cnt, SCHOOLID, StIDStd, escs_trend)
 
-# Verify formats match before merging
-cat("\nSample SCHOOLID from escs_2012:\n")
-head(escs_2012$SCHOOLID)
-cat("\nSample SCHOOLID from MDATA_12_STU_QQQ:\n")
-head(MDATA_12_STU_QQQ$SCHOOLID[MDATA_12_STU_QQQ$CNT == "NOR"])
+# Verify ID formats match before merging
+cat("\nSample SCHOOLID from escs_2012:\n"); head(escs_2012$SCHOOLID)
+cat("\nSample SCHOOLID from MDATA_12_STU_QQQ:\n"); head(MDATA_12_STU_QQQ$SCHOOLID[MDATA_12_STU_QQQ$CNT == "NOR"])
+cat("\nSample StIDStd from escs_2012:\n"); head(escs_2012$StIDStd)
+cat("\nSample StIDStd from MDATA_12_STU_QQQ:\n"); head(MDATA_12_STU_QQQ$StIDStd[MDATA_12_STU_QQQ$CNT == "NOR"])
 
-cat("\nSample StIDStd from escs_2012:\n")
-head(escs_2012$StIDStd)
-cat("\nSample StIDStd from MDATA_12_STU_QQQ:\n")
-head(MDATA_12_STU_QQQ$StIDStd[MDATA_12_STU_QQQ$CNT == "NOR"])
-
-# Merge rescaled ESCS into the main dataset
+# Merge rescaled ESCS into the master dataset (replaces original ESCS column)
 MDATA_12_STU_QQQ <- MDATA_12_STU_QQQ %>%
   left_join(escs_2012, by = c("CNT" = "cnt", "SCHOOLID", "StIDStd")) %>%
-  mutate(ESCS = escs_trend) %>%  # overwrite original ESCS with rescaled version
+  mutate(ESCS = escs_trend) %>%   # overwrite original ESCS with rescaled version
   select(-escs_trend)
 
 # Verify merge quality
-cat("\nRows after merge:", nrow(MDATA_12_STU_QQQ), "\n")  # should be unchanged
-cat("Missing rescaled ESCS:", sum(is.na(MDATA_12_STU_QQQ$ESCS)), "\n")
+cat("\nRows after merge:", nrow(MDATA_12_STU_QQQ), "\n") # Should be unchanged
+cat("Missing rescaled ESCS (overall):", sum(is.na(MDATA_12_STU_QQQ$ESCS)), "\n")
 cat("Missing ESCS for NOR:", sum(is.na(MDATA_12_STU_QQQ$ESCS[MDATA_12_STU_QQQ$CNT == "NOR"])), "\n")
 cat("Missing ESCS for FIN:", sum(is.na(MDATA_12_STU_QQQ$ESCS[MDATA_12_STU_QQQ$CNT == "FIN"])), "\n")
 
 # ==============================================================================
-# Variable selection
+# 2. Variable selection and country subsetting
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Step 1: Define columns and subset by country
+# 2.1  Define column groups
 # ------------------------------------------------------------------------------
 
-pv_cols     <- paste0("PV", 1:5, "MATH")           # 5 PVs in 2012
-w_reps      <- paste0("W_FSTR", 1:80)              # BRR replicate weights
-design_vars <- c("CNT", "STRATUM", "SCHOOLID", "W_FSTUWT", "QuestID")
+pv_cols     <- paste0("PV", 1:5, "MATH")                              # Math plausible values
+w_reps      <- paste0("W_FSTR", 1:80)                                 # BRR replicate weights
+design_vars <- c("CNT", "STRATUM", "SCHOOLID", "W_FSTUWT", "QuestID") # Design variables
 
-# Note: DISCLIM is named DISCLIMA in 2012
-# Note: EXPOFA splits into EXAPPLM and EXPUREM in 2012 — keeping both for diagnostics
-cands <- c("ESCS", "IMMIG", "LANGN",           # student background / demographics
-           "MATHEFF", "ANXMAT",                # learning dispositions
-           "TEACHSUP", "DISCLIMA",             # school climate / learning environment
-           "EXAPPLM", "EXPUREM")               # opportunity to learn (2012 equivalents)
+# SCHOOLID in 2012 (CNTSCHID in 2022).
+# QuestID indicates booklet form (rotated design).
+
+# Notes on 2012-specific variable naming:
+# DISCLIM   → DISCLIMA in 2012
+# EXPOFA    → split into EXAPPLM and EXPUREM in 2012; both retained for diagnostics
+
+cands <- c("ESCS", "IMMIG", "LANGN",         # Student background / demographics
+           "MATHEFF", "ANXMAT",              # Learning dispositions (mathematics)
+           "TEACHSUP", "DISCLIMA",           # School climate / learning environment
+           "EXAPPLM", "EXPUREM")             # Opportunity to learn (2012 equivalents)
 
 keep_cols <- unique(c(design_vars, cands, w_reps, pv_cols))
+
+# ------------------------------------------------------------------------------
+# 2.2  Subset by country
+# ------------------------------------------------------------------------------
 
 STU_NOR_12 <- MDATA_12_STU_QQQ %>% filter(CNT == "NOR") %>% select(all_of(keep_cols))
 STU_FIN_12 <- MDATA_12_STU_QQQ %>% filter(CNT == "FIN") %>% select(all_of(keep_cols))
 
-# Quick checks
 stopifnot(all(keep_cols %in% names(STU_NOR_12)))
 stopifnot(all(keep_cols %in% names(STU_FIN_12)))
-cat("NOR rows:", nrow(STU_NOR_12), "| FIN rows:", nrow(STU_FIN_12), "\n") # NOR should be 4,686 | FIN should be 8,829
+cat("NOR rows:", nrow(STU_NOR_12), "| FIN rows:", nrow(STU_FIN_12), "\n")
+# Expected: NOR = 4,686 | FIN = 8,829
+
+# ==============================================================================
+# 3. Recoding
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Step 2: Strip SPSS labels and recode PISA missing value codes to NA
+# 3.0  Candidate-variable inspection before recoding
 # ------------------------------------------------------------------------------
 
-invalid_codes <- c(9, 99, 999, 9999, 99999, 999999, 9999999,   # Item level non-response
-                   7, 97, 997, 9997, 99997, 999997, 9999997,   # Not-administered
-                   8, 98, 998, 9998, 99998, 999998, 9999998)   # Multiple or invalid responses
+# Raw inspection only; output is not used downstream.
 
-# Note: read_sav(user_na = TRUE) preserves SPSS user-missing metadata rather than
-# converting all such values to ordinary NA automatically. Therefore zap_missing()
-# is used first to convert declared user-missing values to NA. The sentinel
-# recoding below is retained as an additional safeguard.
+categorical_vars <- c("IMMIG", "LANGN")
+continuous_vars  <- setdiff(cands, categorical_vars)
+
+inspect_candidate <- function(data, var, country_label) {
+  x <- data[[var]]
+  
+  cat("\n============================================================\n")
+  cat("Variable:", var, "| Country:", country_label, "\n")
+  cat("============================================================\n")
+  
+  cat("\nClass:", paste(class(x), collapse = ", "), "\n")
+  cat("Type:", typeof(x), "\n")
+  
+  cat("\nSPSS value labels:\n")
+  print(attr(x, "labels"))
+  
+  if (var %in% categorical_vars) {
+    cat("\nObserved categories with labels and counts:\n")
+    
+    out <- data.frame(
+      code  = as.character(x),
+      label = as.character(haven::as_factor(x))
+    ) |>
+      dplyr::count(code, label, name = "n") |>
+      dplyr::arrange(code)
+    
+    print(out, row.names = FALSE)
+    
+  } else {
+    cat("\nSummary statistics:\n")
+    
+    x_num <- as.numeric(x)
+    
+    out <- data.frame(
+      n_valid   = sum(!is.na(x_num)),
+      n_missing = sum(is.na(x_num)),
+      min       = min(x_num, na.rm = TRUE),
+      q1        = quantile(x_num, 0.25, na.rm = TRUE),
+      median    = median(x_num, na.rm = TRUE),
+      mean      = mean(x_num, na.rm = TRUE),
+      q3        = quantile(x_num, 0.75, na.rm = TRUE),
+      max       = max(x_num, na.rm = TRUE),
+      sd        = sd(x_num, na.rm = TRUE)
+    )
+    
+    print(out, row.names = FALSE)
+  }
+}
+
+for (v in cands) inspect_candidate(STU_NOR_12, v, "Norway")
+for (v in cands) inspect_candidate(STU_FIN_12, v, "Finland")
+
+# ------------------------------------------------------------------------------
+# 3.1  Strip SPSS labels and recode missing-value sentinel codes to NA
+# ------------------------------------------------------------------------------
+
+# NOTE: read_sav(user_na = TRUE) imports SPSS user-defined missing values as
+# tagged NAs (or honours na_range / na_values attributes). zap_missing() then
+# converts these to standard NA. The additional sentinel recoding below
+# safeguards against numeric missing codes that were not formally declared as
+# user-missing in the SPSS file.
+
+invalid_codes <- c(9, 99, 999, 9999, 99999, 999999, 9999999,   # Item-level non-response
+                   7, 97, 997, 9997, 99997, 999997, 9999997,   # Not administered
+                   8, 98, 998, 9998, 99998, 999998, 9999998)   # Multiple / invalid responses
 
 recode_pisa <- function(df) {
   df %>%
@@ -162,186 +225,171 @@ recode_pisa <- function(df) {
 STU_NOR_12 <- recode_pisa(STU_NOR_12)
 STU_FIN_12 <- recode_pisa(STU_FIN_12)
 
-# Verify: no labels remain, no sentinel codes remain as non-NA values
+# ------------------------------------------------------------------------------
+# 3.2  Post-cleaning validation
+# ------------------------------------------------------------------------------
+
+# No SPSS-labelled variables remain
 stopifnot(!any(sapply(STU_NOR_12, haven::is.labelled)))
 stopifnot(!any(sapply(STU_FIN_12, haven::is.labelled)))
+
+# No residual numeric sentinel codes remain in candidate variables or PVs
 stopifnot(!any(sapply(c(cands, pv_cols), function(v)
   any(STU_NOR_12[[v]] %in% invalid_codes, na.rm = TRUE))))
 stopifnot(!any(sapply(c(cands, pv_cols), function(v)
   any(STU_FIN_12[[v]] %in% invalid_codes, na.rm = TRUE))))
 
-# ------------------------------------------------------------------------------
-# Step 3: Diagnostic — inspect sentinel code types in raw data
-# ------------------------------------------------------------------------------
+# IMMIG-specific check: only valid codes (1–3) and NA should remain
+stopifnot(!any(STU_NOR_12$IMMIG %in% c(5, 7, 8, 9), na.rm = TRUE))
+stopifnot(!any(STU_FIN_12$IMMIG %in% c(5, 7, 8, 9), na.rm = TRUE))
 
-cat("\n--- Sentinel code presence in raw data (tagged NAs): Norway ---\n")
-sapply(cands, function(v) {
-  any(MDATA_12_STU_QQQ[[v]][MDATA_12_STU_QQQ$CNT == "NOR"] %in% invalid_codes,
-      na.rm = TRUE)
-})
+cat("\nIMMIG distribution after cleaning — Norway:\n")
+print(table(STU_NOR_12$IMMIG, useNA = "ifany"))
 
-cat("\n--- Sentinel code presence in raw data (tagged NAs): Finland ---\n")
-sapply(cands, function(v) {
-  any(MDATA_12_STU_QQQ[[v]][MDATA_12_STU_QQQ$CNT == "FIN"] %in% invalid_codes,
-      na.rm = TRUE)
-})
+cat("\nIMMIG distribution after cleaning — Finland:\n")
+print(table(STU_FIN_12$IMMIG, useNA = "ifany"))
 
 # ------------------------------------------------------------------------------
-# Step 4: Recode LANGN, IMMIG, and QuestID
+# 3.3  Recode LANGN to a binary factor
 # ------------------------------------------------------------------------------
 
-# LANGN
+# LANGN distributions for Norway and Finland (labels and counts)
+# attr(MDATA_12_STU_QQQ$LANGN, "labels")
 
-# Check value labels
-attr(MDATA_12_STU_QQQ$LANGN, "labels")
+langn_counts <- function(data, country) {
+  x <- data$LANGN[data$CNT == country]
+  
+  data.frame(
+    code  = as.character(x),
+    label = as.character(haven::as_factor(x))
+  ) |>
+    dplyr::count(code, label, name = "n") |>
+    dplyr::arrange(code)
+}
 
-# Check LANGN distributions in 2012 raw data
-table(MDATA_12_STU_QQQ$LANGN[MDATA_12_STU_QQQ$CNT == "NOR"])
-table(MDATA_12_STU_QQQ$LANGN[MDATA_12_STU_QQQ$CNT == "FIN"])
+langn_counts(MDATA_12_STU_QQQ, "NOR")
+langn_counts(MDATA_12_STU_QQQ, "FIN")
 
-# !! Verify majority language codes from the output above before running !!
-# Norwegian code in 2022 was 523 — verify it is the same in 2012
-# Finnish code in 2022 was 420, Swedish was 494 — verify in 2012
-
-class(STU_NOR_12$LANGN)
-typeof(STU_NOR_12$LANGN)
-class(STU_FIN_12$LANGN)
-typeof(STU_FIN_12$LANGN)
-
-table(STU_NOR_12$LANGN, useNA = "ifany")
-table(STU_FIN_12$LANGN, useNA = "ifany")
+# Check LANGN structure before binary recoding
+class(STU_NOR_12$LANGN); typeof(STU_NOR_12$LANGN)
+class(STU_FIN_12$LANGN); typeof(STU_FIN_12$LANGN)
 
 # Norway: Norwegian (523) = Majority
 STU_NOR_12 <- STU_NOR_12 %>%
-  mutate(LANGN = factor(
-    case_when(
-      LANGN == "523" ~ "Majority",
-      is.na(LANGN)   ~ NA_character_,
-      TRUE           ~ "Other"
-    ),
-    levels = c("Majority", "Other")
-  ))
+  mutate(
+    LANGN = factor(
+      case_when(
+        LANGN == "523" ~ "Majority",
+        is.na(LANGN)   ~ NA_character_,
+        TRUE           ~ "Other"
+      ),
+      levels = c("Majority", "Other")
+    )
+  )
 
 # Finland: Finnish (420) and Swedish (494) = Majority
 STU_FIN_12 <- STU_FIN_12 %>%
-  mutate(LANGN = factor(
-    case_when(
-      LANGN %in% c("420", "494") ~ "Majority",
-      is.na(LANGN)               ~ NA_character_,
-      TRUE                       ~ "Other"
-    ),
-    levels = c("Majority", "Other")
-  ))
+  mutate(
+    LANGN = factor(
+      case_when(
+        LANGN %in% c("420", "494") ~ "Majority",
+        is.na(LANGN)               ~ NA_character_,
+        TRUE                       ~ "Other"
+      ),
+      levels = c("Majority", "Other")
+    )
+  )
 
-#-------------------------------------------------------------------------------
-# Checks:
-# Check distributions after recoding
-cat("\nLANGN distribution — Norway 2012:\n")
-print(table(STU_NOR_12$LANGN, useNA = "ifany"))
-# Majority should be 4134, Other should be 360 (11+9+28+312), NA should be 192
-
-cat("\nLANGN distribution — Finland 2012:\n")
-print(table(STU_FIN_12$LANGN, useNA = "ifany"))
-# Majority should be 7454 (6253+1201), Other should be 1210, NA should be 165
-
-# Check it is now a factor
-cat("\nClass of LANGN — Norway:", class(STU_NOR_12$LANGN), "\n")
-cat("Class of LANGN — Finland:", class(STU_FIN_12$LANGN), "\n")
-
-# Check factor levels are correct
-cat("\nLevels — Norway:", levels(STU_NOR_12$LANGN), "\n")
-cat("Levels — Finland:", levels(STU_FIN_12$LANGN), "\n")
-
-# Confirm no raw numeric codes remain
-cat("\nAny raw codes remaining in Norway:", 
-    any(STU_NOR_12$LANGN %in% c("523", "264", "494", "540", "840"), na.rm = TRUE), "\n")
-cat("Any raw codes remaining in Finland:", 
-    any(STU_FIN_12$LANGN %in% c("420", "494", "121", "137", "316", "344", "381", "495", "555", "815"), na.rm = TRUE), "\n")
-#-------------------------------------------------------------------------------
-
-# IMMIG
-
-#-------------------------------------------------------------------------------
-# Checks
-# Check IMMIG structure in 2012 before recoding
-cat("Class of IMMIG — Norway:", class(STU_NOR_12$IMMIG), "\n")
-cat("Type of IMMIG — Norway:", typeof(STU_NOR_12$IMMIG), "\n")
-cat("\nRaw IMMIG distribution — Norway 2012:\n")
-print(table(STU_NOR_12$IMMIG, useNA = "ifany"))
-cat("\nRaw IMMIG distribution — Finland 2012:\n")
-print(table(STU_FIN_12$IMMIG, useNA = "ifany"))
-#-------------------------------------------------------------------------------
-
-# Recode IMMIG to factor
-STU_NOR_12 <- STU_NOR_12 %>%
-  mutate(IMMIG = factor(
-    case_when(
-      is.na(IMMIG) ~ NA_character_,
-      TRUE         ~ as.character(IMMIG)
-    ),
-    levels = c("1", "2", "3"),
-    labels = c("Native", "Second-generation", "First-generation")
-  ))
-
-STU_FIN_12 <- STU_FIN_12 %>%
-  mutate(IMMIG = factor(
-    case_when(
-      is.na(IMMIG) ~ NA_character_,
-      TRUE         ~ as.character(IMMIG)
-    ),
-    levels = c("1", "2", "3"),
-    labels = c("Native", "Second-generation", "First-generation")
-  ))
-
-#-------------------------------------------------------------------------------
-# Checks:
-#-------------------------------------------------------------------------------
-cat("\nIMMIG distribution — Norway 2012:\n")
-print(table(STU_NOR_12$IMMIG, useNA = "ifany"))
-# Native should be 4113, Second-generation 229, First-generation 224, NA 120
-
-cat("\nIMMIG distribution — Finland 2012:\n")
-print(table(STU_FIN_12$IMMIG, useNA = "ifany"))
-# Native should be 7406, Second-generation 583, First-generation 687, NA 153
-
-cat("\nClass of IMMIG — Norway:", class(STU_NOR_12$IMMIG), "\n")
-cat("Class of IMMIG — Finland:", class(STU_FIN_12$IMMIG), "\n")
-
-cat("\nLevels of IMMIG — Norway:", levels(STU_NOR_12$IMMIG), "\n")
-cat("Levels of IMMIG — Finland:", levels(STU_FIN_12$IMMIG), "\n")
-
-# Confirm no raw numeric codes remain
-cat("\nAny raw codes remaining in Norway:",
-    any(STU_NOR_12$IMMIG %in% c("1", "2", "3"), na.rm = TRUE), "\n")
-cat("Any raw codes remaining in Finland:",
-    any(STU_FIN_12$IMMIG %in% c("1", "2", "3"), na.rm = TRUE), "\n")
+# Verify LANGN recoding
+cat("\nLANGN distribution — Norway:\n"); print(table(STU_NOR_12$LANGN, useNA = "ifany"))
+# Expected: Majority = 4134, Other = 360 (11+9+28+312), NA = 192
+cat("\nLANGN distribution — Finland:\n"); print(table(STU_FIN_12$LANGN, useNA = "ifany"))
+# Expected: Majority = 7454 (6253+1201), Other = 1210, NA = 165
 
 # ------------------------------------------------------------------------------
+# 3.4  Recode IMMIG to a three-level factor
+# ------------------------------------------------------------------------------
 
-# QuestID
+attr(MDATA_12_STU_QQQ$IMMIG, "labels")
 
-cat("\nQuestID class:", class(STU_NOR_12$QuestID), "\n")
-cat("QuestID type:", typeof(STU_NOR_12$QuestID), "\n")
+# Raw IMMIG distributions for Norway and Finland
+table(MDATA_12_STU_QQQ$IMMIG[MDATA_12_STU_QQQ$CNT == "NOR"])
+table(MDATA_12_STU_QQQ$IMMIG[MDATA_12_STU_QQQ$CNT == "FIN"])
 
-cat("\nQuestID distribution — Norway 2012:\n")
-print(table(STU_NOR_12$QuestID, useNA = "ifany"))
-
-cat("\nQuestID distribution — Finland 2012:\n")
-print(table(STU_FIN_12$QuestID, useNA = "ifany"))
+# Verify cleaned IMMIG distribution: only categories 1–3 and NA should remain
+cat("\nIMMIG distribution — Norway:\n"); print(table(STU_NOR_12$IMMIG, useNA = "ifany"))
+cat("\nIMMIG distribution — Finland:\n"); print(table(STU_FIN_12$IMMIG, useNA = "ifany"))
 
 STU_NOR_12 <- STU_NOR_12 %>%
-  mutate(QuestID = factor(QuestID))
+  mutate(
+    IMMIG = factor(
+      case_when(
+        is.na(IMMIG) ~ NA_character_,
+        TRUE         ~ as.character(IMMIG)
+      ),
+      levels = c("1", "2", "3"),
+      labels = c("Native", "Second-generation", "First-generation")
+    )
+  )
 
 STU_FIN_12 <- STU_FIN_12 %>%
-  mutate(QuestID = factor(QuestID))
+  mutate(
+    IMMIG = factor(
+      case_when(
+        is.na(IMMIG) ~ NA_character_,
+        TRUE         ~ as.character(IMMIG)
+      ),
+      levels = c("1", "2", "3"),
+      labels = c("Native", "Second-generation", "First-generation")
+    )
+  )
 
-cat("\nQuestID levels — Norway:", levels(STU_NOR_12$QuestID), "\n")
-cat("QuestID levels — Finland:", levels(STU_FIN_12$QuestID), "\n")
+# Verify IMMIG recoding
+cat("\nIMMIG distribution — Norway:\n"); print(table(STU_NOR_12$IMMIG, useNA = "ifany"))
+# Expected: Native = 4113, Second-generation = 229, First-generation = 224, NA = 120
+cat("\nIMMIG distribution — Finland:\n"); print(table(STU_FIN_12$IMMIG, useNA = "ifany"))
+# Expected: Native = 7406, Second-generation = 583, First-generation = 687, NA = 153
 
 # ------------------------------------------------------------------------------
-# Step 5: IMMIG vs LANGN — diagnostic comparison
-# Note: uses W_FSTUWT for weighted point estimates only
+# 3.5  Recode QuestID (booklet-form indicator, 2012-specific)
 # ------------------------------------------------------------------------------
+
+# QuestID distribution for Norway and Finland (labels and counts)
+questid_counts <- function(data, country) {
+  x <- data$QuestID[data$CNT == country]
+  
+  data.frame(
+    code  = as.character(x),
+    label = as.character(haven::as_factor(x))
+  ) |>
+    dplyr::count(code, label, name = "n") |>
+    dplyr::arrange(code)
+}
+
+questid_counts(MDATA_12_STU_QQQ, "NOR")
+questid_counts(MDATA_12_STU_QQQ, "FIN")
+
+STU_NOR_12 <- STU_NOR_12 %>% mutate(QuestID = factor(QuestID))
+STU_FIN_12 <- STU_FIN_12 %>% mutate(QuestID = factor(QuestID))
+
+# Verify factor levels
+cat("\nQuestID levels — Norway:",  levels(STU_NOR_12$QuestID), "\n")
+cat("QuestID levels — Finland:",   levels(STU_FIN_12$QuestID), "\n")
+
+# ==============================================================================
+# 4. IMMIG vs LANGN — diagnostic comparison
+# ==============================================================================
+
+# Compares IMMIG and LANGN as alternative demographic predictors. Aim is to
+# assess (1) overlap with ESCS and (2) association with mathematics performance.
+#
+# Both variables are converted to binary numeric indicators for this diagnostic:
+#   LANGN: Majority = 1, Other = 0
+#   IMMIG: Native   = 1, first-/second-generation = 0
+#
+# Weighted point estimates use the final student weight (W_FSTUWT) for
+# descriptive purposes only. No inference is conducted at this stage. Full
+# BRR/Fay variance estimation is applied from Section 6 onward.
 
 weighted_cor <- function(x, y, w) {
   complete <- !is.na(x) & !is.na(y) & !is.na(w)
@@ -352,19 +400,19 @@ weighted_cor <- function(x, y, w) {
   sum(wx * wy) / sqrt(sum(wx^2) * sum(wy^2))
 }
 
-# Convert to binary numeric indicators
+# Convert to binary numeric indicators for diagnostic purposes
 immig_bin_nor_12 <- as.numeric(STU_NOR_12$IMMIG == "Native")
 immig_bin_fin_12 <- as.numeric(STU_FIN_12$IMMIG == "Native")
 langn_bin_nor_12 <- as.numeric(STU_NOR_12$LANGN == "Majority")
 langn_bin_fin_12 <- as.numeric(STU_FIN_12$LANGN == "Majority")
 
-# Correlations with ESCS
+# Correlations with ESCS (overlap with socioeconomic status)
 cor_immig_escs_nor_12 <- weighted_cor(immig_bin_nor_12, STU_NOR_12$ESCS, STU_NOR_12$W_FSTUWT)
 cor_langn_escs_nor_12 <- weighted_cor(langn_bin_nor_12, STU_NOR_12$ESCS, STU_NOR_12$W_FSTUWT)
 cor_immig_escs_fin_12 <- weighted_cor(immig_bin_fin_12, STU_FIN_12$ESCS, STU_FIN_12$W_FSTUWT)
 cor_langn_escs_fin_12 <- weighted_cor(langn_bin_fin_12, STU_FIN_12$ESCS, STU_FIN_12$W_FSTUWT)
 
-# Correlations with math (averaged across all 5 PVs)
+# Correlations with mathematics performance (averaged across all 5 PVs)
 cor_immig_math_nor_12 <- mean(sapply(pv_cols, function(pv)
   weighted_cor(immig_bin_nor_12, STU_NOR_12[[pv]], STU_NOR_12$W_FSTUWT)), na.rm = TRUE)
 cor_langn_math_nor_12 <- mean(sapply(pv_cols, function(pv)
@@ -374,7 +422,7 @@ cor_immig_math_fin_12 <- mean(sapply(pv_cols, function(pv)
 cor_langn_math_fin_12 <- mean(sapply(pv_cols, function(pv)
   weighted_cor(langn_bin_fin_12, STU_FIN_12[[pv]], STU_FIN_12$W_FSTUWT)), na.rm = TRUE)
 
-# Correlation between IMMIG and LANGN
+# Direct overlap between IMMIG and LANGN
 cor_immig_langn_nor_12 <- weighted_cor(immig_bin_nor_12, langn_bin_nor_12, STU_NOR_12$W_FSTUWT)
 cor_immig_langn_fin_12 <- weighted_cor(immig_bin_fin_12, langn_bin_fin_12, STU_FIN_12$W_FSTUWT)
 
@@ -388,61 +436,50 @@ dem_comparison_12 <- data.frame(
                               cor_immig_math_fin_12, cor_langn_math_fin_12)), 3)
 )
 
-cat("\n--- IMMIG vs LANGN diagnostic: 2012 ---\n")
+cat("\n--- IMMIG vs LANGN diagnostic ---\n")
 print(dem_comparison_12)
 
-cat("\n--- Correlation between IMMIG and LANGN: 2012 ---\n")
+cat("\n--- Correlation between IMMIG and LANGN ---\n")
 cat("NOR:", round(cor_immig_langn_nor_12, 3), "\n")
 cat("FIN:", round(cor_immig_langn_fin_12, 3), "\n")
 
 # Decision rule:
-# Prefer the variable that shows less overlap with ESCS while retaining
-# a meaningful association with mathematics performance.
-# Also consider conceptual relevance, consistency across countries,
-# and interpretability in the final model.
+# Prefer the demographic variable that shows less overlap with ESCS while
+# retaining a meaningful association with mathematics performance. Final
+# choice (LANGN) is locked in at Section 9.
 
-# ------------------------------------------------------------------------------
-# Step 6: Identify and remove strata with fewer than 2 PSUs
-# Note: PSU variable is SCHOOLID in 2012 (not CNTSCHID)
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 5. PSU structure and stratum filtering
+# ==============================================================================
 
-# Check variable structure before filtering
-class(STU_NOR_12$STRATUM)
-typeof(STU_NOR_12$STRATUM)
-class(STU_NOR_12$SCHOOLID)
-typeof(STU_NOR_12$SCHOOLID)
+# In the student-level file, PSUs correspond to sampled schools. In 2012 the
+# school identifier is SCHOOLID (CNTSCHID is the 2022 equivalent). Strata
+# containing fewer than two distinct PSUs cannot support BRR variance
+# estimation and must be removed.
 
-class(STU_FIN_12$STRATUM)
-typeof(STU_FIN_12$STRATUM)
-class(STU_FIN_12$SCHOOLID)
-typeof(STU_FIN_12$SCHOOLID)
+# Storage-type checks before filtering
+class(STU_NOR_12$STRATUM);  typeof(STU_NOR_12$STRATUM)
+class(STU_NOR_12$SCHOOLID); typeof(STU_NOR_12$SCHOOLID)
+class(STU_FIN_12$STRATUM);  typeof(STU_FIN_12$STRATUM)
+class(STU_FIN_12$SCHOOLID); typeof(STU_FIN_12$SCHOOLID)
 
-# Count distinct PSUs within each stratum before filtering
-psu_check_nor_12 <- STU_NOR_12 %>%
-  group_by(STRATUM) %>%
-  summarise(
-    n_psu      = n_distinct(SCHOOLID),
-    n_students = n(),
-    .groups    = "drop"
-  ) %>%
-  arrange(n_psu, STRATUM)
+psu_check_12 <- function(df) {
+  df %>%
+    group_by(STRATUM) %>%
+    summarise(n_psu      = n_distinct(SCHOOLID),
+              n_students = n(),
+              .groups    = "drop") %>%
+    arrange(n_psu, STRATUM)
+}
 
-psu_check_fin_12 <- STU_FIN_12 %>%
-  group_by(STRATUM) %>%
-  summarise(
-    n_psu      = n_distinct(SCHOOLID),
-    n_students = n(),
-    .groups    = "drop"
-  ) %>%
-  arrange(n_psu, STRATUM)
+psu_check_nor_12 <- psu_check_12(STU_NOR_12)
+psu_check_fin_12 <- psu_check_12(STU_FIN_12)
 
-cat("\n--- PSU count by stratum before filtering: Norway 2012 ---\n")
-print(psu_check_nor_12)
-cat("\n--- PSU count by stratum before filtering: Finland 2012 ---\n")
-print(psu_check_fin_12)
+cat("\n--- PSU count by stratum before filtering: Norway ---\n");  print(psu_check_nor_12)
+cat("\n--- PSU count by stratum before filtering: Finland ---\n"); print(psu_check_fin_12)
 
-cat("\nNorway: strata with <2 PSUs =", sum(psu_check_nor_12$n_psu < 2), "\n")
-cat("Finland: strata with <2 PSUs =", sum(psu_check_fin_12$n_psu < 2), "\n")
+cat("\nNorway: strata with <2 PSUs =",  sum(psu_check_nor_12$n_psu < 2), "\n")
+cat("Finland: strata with <2 PSUs =",   sum(psu_check_fin_12$n_psu < 2), "\n")
 
 # Function to remove strata with fewer than 2 distinct PSUs
 remove_single_psu_12 <- function(df) {
@@ -464,28 +501,13 @@ remove_single_psu_12 <- function(df) {
 STU_NOR_12 <- remove_single_psu_12(STU_NOR_12)
 STU_FIN_12 <- remove_single_psu_12(STU_FIN_12)
 
-# Verify PSU structure after filtering
-psu_check_nor_12_after <- STU_NOR_12 %>%
-  group_by(STRATUM) %>%
-  summarise(
-    n_psu      = n_distinct(SCHOOLID),
-    n_students = n(),
-    .groups    = "drop"
-  ) %>%
-  arrange(n_psu, STRATUM)
+# Verification — every remaining stratum should now contain >= 2 distinct PSUs
+psu_check_nor_12_after <- psu_check_12(STU_NOR_12)
+psu_check_fin_12_after <- psu_check_12(STU_FIN_12)
 
-psu_check_fin_12_after <- STU_FIN_12 %>%
-  group_by(STRATUM) %>%
-  summarise(
-    n_psu      = n_distinct(SCHOOLID),
-    n_students = n(),
-    .groups    = "drop"
-  ) %>%
-  arrange(n_psu, STRATUM)
-
-cat("\n--- PSU count by stratum after filtering: Norway 2012 ---\n")
+cat("\n--- PSU count by stratum after filtering: Norway ---\n")
 print(psu_check_nor_12_after, n = Inf)
-cat("\n--- PSU count by stratum after filtering: Finland 2012 ---\n")
+cat("\n--- PSU count by stratum after filtering: Finland ---\n")
 print(psu_check_fin_12_after, n = Inf)
 
 cat("\nNorway: any strata with <2 PSUs after filtering? ",
@@ -493,19 +515,17 @@ cat("\nNorway: any strata with <2 PSUs after filtering? ",
 cat("Finland: any strata with <2 PSUs after filtering? ",
     any(psu_check_fin_12_after$n_psu < 2), "\n")
 
-# ------------------------------------------------------------------------------
-# Step 7: Build BRR survey designs (2012)
-# PISA 2012 uses Fay's BRR replication; the final student weight (W_FSTUWT)
-# and the 80 replicate weights (W_FSTR1-W_FSTR80) are used here.
-# Note: 2012 replicate weights are named W_FSTR1-W_FSTR80
-#       (not W_FSTURWT1-W_FSTURWT80 as in 2022)
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 6. Build BRR survey designs
+# ==============================================================================
+
+# PISA 2012 uses Fay's modified BRR (rho = 0.5). Survey design objects are
+# constructed using the final student weight (W_FSTUWT) and the 80 replicate
+# weights (W_FSTR1–W_FSTR80; named W_FSTURWT1–W_FSTURWT80 in 2022).
 
 # Check structure of the full weight and replicate weights
-class(STU_NOR_12$W_FSTUWT)
-typeof(STU_NOR_12$W_FSTUWT)
-class(STU_FIN_12$W_FSTUWT)
-typeof(STU_FIN_12$W_FSTUWT)
+class(STU_NOR_12$W_FSTUWT); typeof(STU_NOR_12$W_FSTUWT)
+class(STU_FIN_12$W_FSTUWT); typeof(STU_FIN_12$W_FSTUWT)
 
 # Check that all replicate-weight columns are present
 stopifnot(all(w_reps %in% names(STU_NOR_12)))
@@ -516,9 +536,8 @@ stopifnot(all(sapply(STU_NOR_12[, w_reps], is.numeric)))
 stopifnot(all(sapply(STU_FIN_12[, w_reps], is.numeric)))
 
 # Check for missing values in the final weight and replicate weights
-cat("\nMissing values in W_FSTUWT — Norway:", sum(is.na(STU_NOR_12$W_FSTUWT)), "\n")
-cat("Missing values in W_FSTUWT — Finland:", sum(is.na(STU_FIN_12$W_FSTUWT)), "\n")
-
+cat("\nMissing values in W_FSTUWT — Norway:",  sum(is.na(STU_NOR_12$W_FSTUWT)), "\n")
+cat("Missing values in W_FSTUWT — Finland:",   sum(is.na(STU_FIN_12$W_FSTUWT)), "\n")
 cat("\nMissing values across BRR replicate weights — Norway:",
     sum(is.na(as.matrix(STU_NOR_12[, w_reps]))), "\n")
 cat("Missing values across BRR replicate weights — Finland:",
@@ -542,21 +561,23 @@ des_nor_12 <- make_design_12(STU_NOR_12, w_reps)
 des_fin_12 <- make_design_12(STU_FIN_12, w_reps)
 
 # Verify design objects
-cat("\n--- Survey design summary: Norway 2012 ---\n")
-print(summary(des_nor_12))
-cat("\n--- Survey design summary: Finland 2012 ---\n")
-print(summary(des_fin_12))
+cat("\n--- Survey design summary: Norway ---\n");  print(summary(des_nor_12))
+cat("\n--- Survey design summary: Finland ---\n"); print(summary(des_fin_12))
 
-cat("\nWeighted mean ESCS — Norway 2012:\n")
-print(svymean(~ESCS, des_nor_12, na.rm = TRUE))
-cat("\nWeighted mean ESCS — Finland 2012:\n")
-print(svymean(~ESCS, des_fin_12, na.rm = TRUE))
+cat("\nWeighted mean ESCS — Norway:\n");  print(svymean(~ESCS, des_nor_12, na.rm = TRUE))
+cat("\nWeighted mean ESCS — Finland:\n"); print(svymean(~ESCS, des_fin_12, na.rm = TRUE))
+
+# ==============================================================================
+# 7. Missingness analysis
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Step 8: Weighted missingness per predictor (2012)
+# 7.1  Weighted missingness per predictor
+# ------------------------------------------------------------------------------
+
 # Computes the weighted percentage of missing values for each predictor using
-# the BRR survey design.
-# ------------------------------------------------------------------------------
+# the BRR survey design. Missingness is coded as a 0/1 indicator, so the
+# weighted mean equals the weighted share of missing values.
 
 weighted_missing_12 <- function(design, vars) {
   res <- sapply(vars, function(v) {
@@ -564,62 +585,67 @@ weighted_missing_12 <- function(design, vars) {
     m <- svymean(f, design = design, na.rm = TRUE)
     round(as.numeric(m) * 100, 2)
   })
-  data.frame(
-    variable    = vars,
-    missing_pct = as.numeric(res),
-    row.names   = NULL
-  )
+  data.frame(variable    = vars,
+             missing_pct = as.numeric(res),
+             row.names   = NULL)
 }
 
 miss_nor_12 <- weighted_missing_12(des_nor_12, cands)
 miss_fin_12 <- weighted_missing_12(des_fin_12, cands)
 
-miss_summary_12 <- merge(
-  miss_nor_12, miss_fin_12,
-  by = "variable", suffixes = c("_NOR", "_FIN")
-)
+miss_summary_12 <- merge(miss_nor_12, miss_fin_12,
+                         by = "variable", suffixes = c("_NOR", "_FIN"))
 
-cat("\n--- Weighted missingness (%) by predictor: 2012 ---\n")
+cat("\n--- Weighted missingness (%) by predictor ---\n")
 print(miss_summary_12)
 
 # Thresholds for interpretation:
 # > 5% warrants discussion
 # > 30% suggests exclusion unless strong substantive reason to retain
 
-#------------------------------------------------------------------------------- 
-# Checks:
-#------------------------------------------------------------------------------- 
+# ------------------------------------------------------------------------------
+# 7.2  Booklet-aware missingness diagnostic (2012-specific)
+# ------------------------------------------------------------------------------
+
+# 2012 used a rotated booklet design: each questionnaire form (QuestID)
+# carried only a subset of the non-cognitive scales. Cross-tabulating
+# QuestID against missingness identifies which forms genuinely lacked which
+# variables (missing-by-design) versus genuine item non-response.
+
 # Extract QuestID from the master copy for Norway and Finland
 questid_nor <- STU_NOR_12$QuestID
 questid_fin <- STU_FIN_12$QuestID
 
-# Check booklet assignment vs missingness on ANXMAT
+# Booklet assignment vs ANXMAT missingness (illustrative)
 cat("\n--- Booklet assignment vs ANXMAT missingness: Norway 2012 ---\n")
 print(table(questid_nor, is.na(STU_NOR_12$ANXMAT)))
 
 cat("\n--- Booklet assignment vs ANXMAT missingness: Finland 2012 ---\n")
 print(table(questid_fin, is.na(STU_FIN_12$ANXMAT)))
 
-# Document the analytic sample for 2012 after accounting for booklet design
+# Document the analytic sample after accounting for booklet design.
+# Forms 2 and 3 in Norway received ANXMAT items; in Finland, forms 2, 3, 5.
 cat("\nStudents who received ANXMAT items — Norway 2012:",
     sum(questid_nor %in% c(2, 3)), "\n")
 cat("Students who received ANXMAT items — Finland 2012:",
     sum(questid_fin %in% c(2, 3, 5)), "\n")
 
-# Effective missing rate among students who received the items
-cat("\nGenuine nonresponse rate among booklet recipients:\n")
-cat("Norway:", round(sum(questid_nor == 2 & is.na(STU_NOR_12$ANXMAT)) +
-                       sum(questid_nor == 3 & is.na(STU_NOR_12$ANXMAT)),0),
-    "out of", sum(questid_nor %in% c(2,3)), "=",
+# Effective non-response rate among students who actually received the items
+cat("\nGenuine non-response rate among booklet recipients (ANXMAT):\n")
+cat("Norway:",
+    round(sum(questid_nor == 2 & is.na(STU_NOR_12$ANXMAT)) +
+            sum(questid_nor == 3 & is.na(STU_NOR_12$ANXMAT)), 0),
+    "out of", sum(questid_nor %in% c(2, 3)), "=",
     round((sum(questid_nor == 2 & is.na(STU_NOR_12$ANXMAT)) +
              sum(questid_nor == 3 & is.na(STU_NOR_12$ANXMAT))) /
-            sum(questid_nor %in% c(2,3)) * 100, 2), "%\n")
-cat("Finland:", round(sum(questid_fin %in% c(2, 3, 5) & is.na(STU_FIN_12$ANXMAT)), 0),
+            sum(questid_nor %in% c(2, 3)) * 100, 2), "%\n")
+cat("Finland:",
+    round(sum(questid_fin %in% c(2, 3, 5) & is.na(STU_FIN_12$ANXMAT)), 0),
     "out of", sum(questid_fin %in% c(2, 3, 5)), "=",
     round(sum(questid_fin %in% c(2, 3, 5) & is.na(STU_FIN_12$ANXMAT)) /
             sum(questid_fin %in% c(2, 3, 5)) * 100, 2), "%\n")
 
-# Check booklet pattern for all rotated variables
+# Booklet-vs-missingness summary for all rotated variables
 rotated_vars <- c("MATHEFF", "ANXMAT", "TEACHSUP", "DISCLIMA", "EXAPPLM", "EXPUREM")
 
 cat("\n--- Booklet vs missingness summary: Norway 2012 ---\n")
@@ -633,24 +659,26 @@ for (v in rotated_vars) {
   tab <- table(questid_fin, is.na(STU_FIN_12[[v]]))
   cat(v, "— missing by form:", paste(tab[, "TRUE"], collapse = " / "), "\n")
 }
-#-------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-# Step 9: Complete cases summary (2012)
+# 7.3  Complete-case summary (unweighted and weighted)
 # ------------------------------------------------------------------------------
+
+# Documents how casewise deletion would affect the analytic sample. In 2012,
+# the booklet-rotation design means complete-case analysis would discard the
+# vast majority of observations (no student saw all questionnaire constructs),
+# providing strong justification for multiple imputation.
 
 stopifnot(all(cands %in% names(STU_NOR_12)))
 stopifnot(all(cands %in% names(STU_FIN_12)))
 
 cat("\n--- Predictors included in complete-case check: 2012 ---\n")
 print(cands)
-
 cat("\nRows in STU_NOR_12:", nrow(STU_NOR_12), "\n")
 cat("Rows in STU_FIN_12:", nrow(STU_FIN_12), "\n")
 
 cat("\n--- Unweighted missing counts by predictor: Norway 2012 ---\n")
 print(colSums(is.na(STU_NOR_12[, cands])))
-
 cat("\n--- Unweighted missing counts by predictor: Finland 2012 ---\n")
 print(colSums(is.na(STU_FIN_12[, cands])))
 
@@ -672,11 +700,11 @@ cc_table_12 <- bind_rows(
   complete_cases_summary_12(STU_FIN_12, cands)
 )
 
-cat("\n--- Complete cases summary: 2012 ---\n")
+cat("\n--- Complete cases summary (unweighted analytic sample): 2012 ---\n")
 print(cc_table_12)
 stopifnot(all(cc_table_12$n_complete + cc_table_12$n_dropped == cc_table_12$n_total))
 
-# Weighted complete cases
+# Add complete-case flag and rebuild design objects for weighted summary
 add_complete_case_flag_12 <- function(df, vars) {
   df$cc_all <- as.numeric(complete.cases(df[, vars]))
   df
@@ -708,41 +736,23 @@ cat("\n--- Complete cases summary (unweighted + weighted): 2012 ---\n")
 print(cc_summary_full_12)
 
 # ------------------------------------------------------------------------------
-# Step 10: Little's MCAR test (2012)
+# 7.4  MAR plausibility — survey-weighted logistic regressions of missingness
 # ------------------------------------------------------------------------------
 
-little_data_nor_12 <- STU_NOR_12[, cands]
-little_data_fin_12 <- STU_FIN_12[, cands]
+# Models a binary missingness indicator (1 = missing, 0 = observed) for each
+# variable with notable missingness, regressed on observed covariates
+# (ESCS, IMMIG, LANGN, QuestID). For the rotated variables in 2012, QuestID
+# captures most of the missingness pattern by design.
 
-little_data_nor_12[] <- lapply(little_data_nor_12,
-                               function(x) if (is.factor(x)) as.numeric(x) else x)
-little_data_fin_12[] <- lapply(little_data_fin_12,
-                               function(x) if (is.factor(x)) as.numeric(x) else x)
-
-cat("\n--- Little's MCAR test: Norway 2012 ---\n")
-print(mcar_test(little_data_nor_12))
-
-cat("\n--- Little's MCAR test: Finland 2012 ---\n")
-print(mcar_test(little_data_fin_12))
-
-# Note on Little's MCAR test result for 2012:
-# The significant result (p = 0) reflects the systematic booklet-driven
-# missing pattern rather than student-characteristic-driven nonresponse.
-# Little's test cannot distinguish between missing-by-design (MCAR by
-# random booklet assignment) and missing-by-student-characteristics (MAR).
-# The booklet assignment analysis above provides stronger and more direct
-# evidence that missingness in 2012 is MCAR by design — Form 1 students
-# were randomly assigned and systematically lack ANXMAT/TEACHSUP/DISCLIMA,
-# while Form 2 students lack EXAPPLM/EXPUREM, and Form 3 students lack
-# MATHEFF. Genuine nonresponse within booklet forms is below 3.2%.
-
-# ------------------------------------------------------------------------------
-# MCAR diagnostics
-# ------------------------------------------------------------------------------
-
-miss_vars_12  <- cands[!cands %in% c("ESCS", "IMMIG", "LANGN")]
+miss_vars_12     <- cands[!cands %in% c("ESCS", "IMMIG", "LANGN")]
 mis_predictors_12 <- c("ESCS", "IMMIG", "LANGN", "QuestID")
 
+stopifnot(all(miss_vars_12 %in% names(STU_NOR_12)))
+stopifnot(all(miss_vars_12 %in% names(STU_FIN_12)))
+stopifnot(all(mis_predictors_12 %in% names(STU_NOR_12)))
+stopifnot(all(mis_predictors_12 %in% names(STU_FIN_12)))
+
+# Add missingness indicators to each dataset
 add_missing_indicators_12 <- function(df, vars) {
   for (v in vars) df[[paste0("mis_", v)]] <- as.numeric(is.na(df[[v]]))
   df
@@ -751,10 +761,16 @@ add_missing_indicators_12 <- function(df, vars) {
 STU_NOR_12 <- add_missing_indicators_12(STU_NOR_12, miss_vars_12)
 STU_FIN_12 <- add_missing_indicators_12(STU_FIN_12, miss_vars_12)
 
-# Rebuild designs with missingness indicators
+# Rebuild survey designs so the new indicators are visible
 des_nor_12 <- make_design_12(STU_NOR_12, w_reps)
 des_fin_12 <- make_design_12(STU_FIN_12, w_reps)
 
+cat("\n--- Missingness indicator checks: Norway 2012 ---\n")
+print(colSums(STU_NOR_12[, paste0("mis_", miss_vars_12)]))
+cat("\n--- Missingness indicator checks: Finland 2012 ---\n")
+print(colSums(STU_FIN_12[, paste0("mis_", miss_vars_12)]))
+
+# Function to run weighted logistic regressions of missingness
 run_missingness_models_12 <- function(design, miss_vars, predictors, country_label) {
   lapply(setNames(miss_vars, paste0(country_label, "_", miss_vars)), function(v) {
     preds_v <- setdiff(predictors, v)
@@ -782,58 +798,45 @@ for (nm in names(mods_mis_fin_12)) {
   print(summary(mods_mis_fin_12[[nm]]))
 }
 
-# Little's MCAR test
-library(naniar)
+# ------------------------------------------------------------------------------
+# 7.5  Little's MCAR test (supplementary, unweighted)
+# ------------------------------------------------------------------------------
+
+# Reported only as a supplementary diagnostic. Does not account for the
+# complex survey design or weights. In 2012 specifically, a significant
+# Little's test result reflects the systematic booklet-driven missing pattern
+# rather than student-characteristic-driven non-response. Little's test cannot
+# distinguish missing-by-design (MCAR by random booklet assignment) from
+# missing-by-student-characteristics (MAR). The booklet diagnostics in
+# Section 7.2 provide stronger and more direct evidence that missingness in
+# the rotated variables is MCAR by design.
+
 little_data_nor_12 <- STU_NOR_12[, cands]
 little_data_fin_12 <- STU_FIN_12[, cands]
-little_data_nor_12[] <- lapply(little_data_nor_12, function(x) if (is.factor(x)) as.numeric(x) else x)
-little_data_fin_12[] <- lapply(little_data_fin_12, function(x) if (is.factor(x)) as.numeric(x) else x)
 
-cat("\n--- Little's MCAR test: Norway 2012 ---\n")
-print(mcar_test(little_data_nor_12))
-cat("\n--- Little's MCAR test: Finland 2012 ---\n")
-print(mcar_test(little_data_fin_12))
+little_data_nor_12[] <- lapply(little_data_nor_12,
+                               function(x) if (is.factor(x)) as.numeric(x) else x)
+little_data_fin_12[] <- lapply(little_data_fin_12,
+                               function(x) if (is.factor(x)) as.numeric(x) else x)
+
+cat("\n--- Little's MCAR test: Norway 2012 ---\n");  print(mcar_test(little_data_nor_12))
+cat("\n--- Little's MCAR test: Finland 2012 ---\n"); print(mcar_test(little_data_fin_12))
 
 # ==============================================================================
-# Helper functions (defined here for self-contained 2012 script)
+# 8. Pre-imputation predictor screening
 # ==============================================================================
 
-# Weighted Pearson correlation
-weighted_cor <- function(x, y, w) {
-  complete <- !is.na(x) & !is.na(y) & !is.na(w)
-  x <- x[complete]; y <- y[complete]; w <- w[complete]
-  if (length(x) < 3) return(NA_real_)
-  wx <- w * (x - weighted.mean(x, w))
-  wy <- w * (y - weighted.mean(y, w))
-  sum(wx * wy) / sqrt(sum(wx^2) * sum(wy^2))
-}
-
-# Weighted correlation matrix via svyvar
-weighted_cor_matrix <- function(vars, design) {
-  f       <- as.formula(paste("~", paste(vars, collapse = " + ")))
-  cov_mat <- as.matrix(svyvar(f, design, na.rm = TRUE))
-  sd_vec  <- sqrt(diag(cov_mat))
-  cov_mat / (sd_vec %o% sd_vec)
-}
-
-# Flag highly correlated predictor pairs
-find_high_corr_pairs <- function(cor_mat, cutoff = 0.8) {
-  idx <- which(abs(cor_mat) > cutoff & upper.tri(cor_mat), arr.ind = TRUE)
-  if (nrow(idx) == 0) return(data.frame())
-  data.frame(
-    var1 = rownames(cor_mat)[idx[, 1]],
-    var2 = colnames(cor_mat)[idx[, 2]],
-    corr = cor_mat[idx],
-    row.names = NULL
-  )
-}
-
 # ------------------------------------------------------------------------------
-# Step 11: Weighted inter-predictor correlation matrix (2012)
-# Note: svyvar() fails due to high booklet-driven missingness (~35%) on
-# rotated variables. Using pairwise weighted_cor() instead, which handles
-# NA values by computing each pair on complete cases only.
+# 8.1  Weighted inter-predictor correlation matrix
 # ------------------------------------------------------------------------------
+
+# Identifies highly correlated predictor pairs (|r| > .80) as a multicollinearity
+# screen.
+#
+# 2012-specific note: svyvar() fails on the rotated questionnaire constructs
+# because no student has complete data on all of them simultaneously
+# (~35% missing-by-design on each rotated variable). Pairwise weighted_cor()
+# is used instead — each pair is computed on its own complete-case set.
 
 cont_cands_12 <- cands[!cands %in% c("IMMIG", "LANGN")]
 
@@ -842,8 +845,8 @@ print(cont_cands_12)
 
 # Build pairwise weighted correlation matrix
 pairwise_wcor_matrix <- function(df, vars, weight_var) {
-  n    <- length(vars)
-  mat  <- matrix(NA, n, n, dimnames = list(vars, vars))
+  n   <- length(vars)
+  mat <- matrix(NA, n, n, dimnames = list(vars, vars))
   diag(mat) <- 1
   for (i in 1:(n - 1)) {
     for (j in (i + 1):n) {
@@ -860,50 +863,63 @@ pairwise_wcor_matrix <- function(df, vars, weight_var) {
 wcor_nor_12 <- pairwise_wcor_matrix(STU_NOR_12, cont_cands_12, "W_FSTUWT")
 wcor_fin_12 <- pairwise_wcor_matrix(STU_FIN_12, cont_cands_12, "W_FSTUWT")
 
-cat("\n--- Weighted predictor correlations: Norway 2012 ---\n")
-print(round(wcor_nor_12, 3))
+cat("\n--- Weighted predictor correlations: Norway 2012 ---\n");  print(round(wcor_nor_12, 3))
+cat("\n--- Weighted predictor correlations: Finland 2012 ---\n"); print(round(wcor_fin_12, 3))
 
-cat("\n--- Weighted predictor correlations: Finland 2012 ---\n")
-print(round(wcor_fin_12, 3))
+# Visualise correlation matrices
+plot_weighted_corr_12 <- function(cor_mat, country_label) {
+  corrplot::corrplot(
+    cor_mat,
+    method      = "color",
+    type        = "upper",
+    addCoef.col = "black",
+    number.cex  = 0.75,
+    tl.col      = "black",
+    tl.cex      = 0.9,
+    tl.srt      = 45,
+    col         = corrplot::COL2("RdBu", 200),
+    cl.cex      = 0.8,
+    diag        = TRUE,
+    mar         = c(0, 0, 3, 0),
+    title       = paste0(country_label,
+                         "\nWeighted inter-predictor correlations")
+  )
+}
 
-# Visualise
-corrplot::corrplot(
-  wcor_nor_12,
-  method      = "color",
-  type        = "upper",
-  tl.col      = "black",
-  addCoef.col = "black",
-  number.cex  = 0.7,
-  title       = "Norway 2012",
-  mar         = c(0, 0, 1, 0)
-)
+plot_weighted_corr_12(wcor_nor_12, "Norway, PISA 2012")
+plot_weighted_corr_12(wcor_fin_12, "Finland, PISA 2012")
 
-corrplot::corrplot(
-  wcor_fin_12,
-  method      = "color",
-  type        = "upper",
-  tl.col      = "black",
-  addCoef.col = "black",
-  number.cex  = 0.7,
-  title       = "Finland 2012",
-  mar         = c(0, 0, 1, 0)
-)
+# Flag highly correlated predictor pairs
+find_high_corr_pairs <- function(cor_mat, cutoff = 0.8) {
+  idx <- which(abs(cor_mat) > cutoff & upper.tri(cor_mat), arr.ind = TRUE)
+  if (nrow(idx) == 0) return(data.frame())
+  data.frame(
+    var1 = rownames(cor_mat)[idx[, 1]],
+    var2 = colnames(cor_mat)[idx[, 2]],
+    corr = cor_mat[idx],
+    row.names = NULL
+  )
+}
 
-# Flag high correlations
-cat("\n--- Predictor pairs with |r| > .80: Norway 2012 ---\n")
-print(find_high_corr_pairs(wcor_nor_12))
-
-cat("\n--- Predictor pairs with |r| > .80: Finland 2012 ---\n")
-print(find_high_corr_pairs(wcor_fin_12))
+cat("\n--- Predictor pairs with |r| > .80: Norway 2012 ---\n");  print(find_high_corr_pairs(wcor_nor_12))
+cat("\n--- Predictor pairs with |r| > .80: Finland 2012 ---\n"); print(find_high_corr_pairs(wcor_fin_12))
 
 # ------------------------------------------------------------------------------
-# Step 12: VIF check (unweighted, diagnostic only) — 2012
-# Note: Due to missing-by-design booklet structure, no student has complete
-# data on all predictors simultaneously. VIF is therefore computed separately
-# for each booklet form's variable subset using the relevant student subsample.
+# 8.2  VIF (unweighted, diagnostic only) — booklet-aware
 # ------------------------------------------------------------------------------
 
-predictors_screen_12 <- c("ESCS", "IMMIG", "LANGN", 
+# Directional multicollinearity screen using PV1MATH as a proxy outcome.
+#
+# 2012-specific note: due to the rotated booklet design, no student has
+# complete data on all candidate predictors simultaneously. VIF is therefore
+# computed separately for each booklet form's available variable subset using
+# the relevant student subsample.
+#
+# Interpretation:
+#   VIF > 5  warrants attention
+#   VIF > 10 problematic
+
+predictors_screen_12 <- c("ESCS", "IMMIG", "LANGN",
                           cont_cands_12[cont_cands_12 != "ESCS"])
 
 cat("\n--- Provisional predictors for VIF screening: 2012 ---\n")
@@ -912,8 +928,8 @@ print(predictors_screen_12)
 stopifnot(all(predictors_screen_12 %in% names(STU_NOR_12)))
 stopifnot(all(predictors_screen_12 %in% names(STU_FIN_12)))
 
-# Form 2 variables: MATHEFF, ANXMAT, TEACHSUP, DISCLIMA available
-# (Form 1 students missing these — exclude Form 1)
+# Form 2 subsample: MATHEFF, ANXMAT, TEACHSUP, DISCLIMA available
+# (Form 1 students do not receive these — exclude Form 1)
 form2_vars_nor <- !is.na(STU_NOR_12$MATHEFF) & !is.na(STU_NOR_12$ANXMAT)
 form2_vars_fin <- !is.na(STU_FIN_12$MATHEFF) & !is.na(STU_FIN_12$ANXMAT)
 
@@ -922,15 +938,13 @@ vif_formula_form2 <- as.formula(
 )
 
 cat("\n--- VIF (Form 2 subsample — MATHEFF/ANXMAT/TEACHSUP/DISCLIMA): Norway 2012 ---\n")
-print(round(car::vif(lm(vif_formula_form2, 
-                        data = STU_NOR_12[form2_vars_nor, ])), 2))
+print(round(car::vif(lm(vif_formula_form2, data = STU_NOR_12[form2_vars_nor, ])), 2))
 
 cat("\n--- VIF (Form 2 subsample — MATHEFF/ANXMAT/TEACHSUP/DISCLIMA): Finland 2012 ---\n")
-print(round(car::vif(lm(vif_formula_form2, 
-                        data = STU_FIN_12[form2_vars_fin, ])), 2))
+print(round(car::vif(lm(vif_formula_form2, data = STU_FIN_12[form2_vars_fin, ])), 2))
 
-# Form 1 variables: EXAPPLM, EXPUREM available
-# (Form 2 and 3 students missing these — exclude them)
+# Form 1 subsample: EXAPPLM, EXPUREM available
+# (Form 2 and Form 3 students do not receive these — exclude them)
 form1_vars_nor <- !is.na(STU_NOR_12$EXAPPLM)
 form1_vars_fin <- !is.na(STU_FIN_12$EXAPPLM)
 
@@ -939,69 +953,93 @@ vif_formula_form1 <- as.formula(
 )
 
 cat("\n--- VIF (Form 1 subsample — EXAPPLM/EXPUREM): Norway 2012 ---\n")
-print(round(car::vif(lm(vif_formula_form1,
-                        data = STU_NOR_12[form1_vars_nor, ])), 2))
+print(round(car::vif(lm(vif_formula_form1, data = STU_NOR_12[form1_vars_nor, ])), 2))
 
 cat("\n--- VIF (Form 1 subsample — EXAPPLM/EXPUREM): Finland 2012 ---\n")
-print(round(car::vif(lm(vif_formula_form1,
-                        data = STU_FIN_12[form1_vars_fin, ])), 2))
-
-# Interpretation guideline:
-# - VIF > 5: warrants attention
-# - VIF > 10: problematic
+print(round(car::vif(lm(vif_formula_form1, data = STU_FIN_12[form1_vars_fin, ])), 2))
 
 # ------------------------------------------------------------------------------
-# Step 13: Country-level entirely-missing check — 2012
+# 8.3  Country-level entirely-missing check
 # ------------------------------------------------------------------------------
+
+# Defensive check: ensures no candidate predictor is entirely missing within
+# either country sample (would block imputation).
 
 entirely_missing <- function(df, vars) {
   sapply(vars, function(v) all(is.na(df[[v]])))
 }
 
-cat("\n--- Entirely missing: Norway 2012 ---\n")
-print(entirely_missing(STU_NOR_12, predictors_screen_12))
-
-cat("\n--- Entirely missing: Finland 2012 ---\n")
-print(entirely_missing(STU_FIN_12, predictors_screen_12))
+cat("\n--- Entirely missing: Norway 2012 ---\n");  print(entirely_missing(STU_NOR_12, predictors_screen_12))
+cat("\n--- Entirely missing: Finland 2012 ---\n"); print(entirely_missing(STU_FIN_12, predictors_screen_12))
 
 cat("\nProvisional predictor set retained for now: 2012\n")
 print(predictors_screen_12)
 
-# ------------------------------------------------------------------------------
-# Step 14: Confirm final predictor set
-# This block defines the confirmed predictor set for use in multiple imputation 
-# and Oaxaca-Blinder decomposition. No further variables are dropped or added
-# beyond this point.
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 9. Final predictor set
+# ==============================================================================
 
-# Final predictor set: ESCS, LANGN, MATHEFF, ANXMAT, TEACHSUP
+# Locks in the predictors used for multiple imputation and the Oaxaca–Blinder
+# decomposition. Justifications for each choice are documented in the methods
+# chapter:
+#   - ESCS (rescaled to 2022 metric), MATHEFF, ANXMAT, TEACHSUP retained as core predictors.
+#   - LANGN preferred over IMMIG: lower overlap with ESCS while retaining a
+#     meaningful association with mathematics performance, and consistent
+#     across both countries (cf. Section 4).
+#   - DISCLIMA, EXAPPLM, EXPUREM dropped (low predictive value / overlap /
+#     additional booklet-rotation complications).
+#   - IMMIG dropped to avoid multicollinearity with LANGN.
 
-final_preds_12 <- c("ESCS", "LANGN", "MATHEFF", "ANXMAT", "TEACHSUP")
+final_preds_12      <- c("ESCS", "LANGN", "MATHEFF", "ANXMAT", "TEACHSUP")
 final_cont_preds_12 <- final_preds_12[!final_preds_12 %in% "LANGN"]
 
-# Confirm all final predictors are present in both country datasets
 stopifnot(all(final_preds_12 %in% names(STU_NOR_12)))
 stopifnot(all(final_preds_12 %in% names(STU_FIN_12)))
 
-cat("\n--- Final predictor set: 2012 ---\n")
-print(final_preds_12)
-
-cat("\nFinal continuous predictors:\n")
-print(final_cont_preds_12)
-
+cat("\n--- Final predictor set: 2012 ---\n"); print(final_preds_12)
+cat("\nFinal continuous predictors:\n");      print(final_cont_preds_12)
 cat("\nFinal sample sizes:\n")
-cat("Norway:", nrow(STU_NOR_12), "\n")
+cat("Norway:",  nrow(STU_NOR_12), "\n")
 cat("Finland:", nrow(STU_FIN_12), "\n")
 
 # ==============================================================================
-# Multiple Imputation — PISA 2012
-# Sensitivity analysis:
-#   A) with QuestID in the imputation model
-#   B) without QuestID in the imputation model
+# 10. Multiple imputation (MICE)
 # ==============================================================================
+#
+# Strategy
+# --------
+# For each of the 5 plausible values, a separate dataset is constructed in
+# which that PV is renamed PV_MATH. mice() is run on each PV-specific dataset
+# with m = 40 imputations, yielding 5 × 40 = 200 imputed datasets per country.
+# (m = 40 used here vs m = 20 in 2022 to compensate for the larger missing
+# fraction induced by the booklet rotation.)
+#
+# Configuration
+# -------------
+#   PV_MATH       — included as a predictor but not imputed (plausible values
+#                   are treated as fixed draws from the posterior distribution).
+#   W_FSTUWT      — excluded from the imputation model.
+#   QuestID       — handled in a sensitivity analysis (see Section 10.2):
+#                   imputation is run both with and without QuestID as an
+#                   auxiliary predictor.
+#   LANGN         — imputed via logistic regression (binary factor).
+#   ESCS, MATHEFF,
+#   ANXMAT,
+#   TEACHSUP      — imputed via predictive mean matching (PMM).
+#
+# Sensitivity analysis (2012-specific)
+# ------------------------------------
+# Two parallel MI branches are run:
+#   Branch A (withQ): QuestID is included as a predictor in the imputation
+#                     model. Theoretically this helps mice() exploit the
+#                     systematic booklet-rotation pattern.
+#   Branch B (noQ):   QuestID is excluded. Provides a benchmark that does not
+#                     rely on QuestID for plausibility.
+# Branches are compared on convergence and downstream stability before the
+# final analysis dataset is selected (see Section 10.6).
 
 # ------------------------------------------------------------------------------
-# Helper functions for MI pipeline
+# 10.1  Helper functions for MI pipeline
 # ------------------------------------------------------------------------------
 
 build_imp_config <- function(data, cont_preds, factor_preds,
@@ -1009,26 +1047,23 @@ build_imp_config <- function(data, cont_preds, factor_preds,
                              weight_col = "W_FSTUWT") {
   pred <- mice::make.predictorMatrix(data)
   
-  # Exclude survey weight entirely
+  # Exclude survey weight from imputation entirely
   if (weight_col %in% colnames(pred)) {
     pred[weight_col, ] <- 0
     pred[, weight_col] <- 0
   }
   
-  # Variables used only as predictors, not imputed
+  # Variables used only as predictors, not themselves imputed
   for (v in predictor_only_vars) {
-    if (v %in% colnames(pred)) {
-      pred[v, ] <- 0
-    }
+    if (v %in% colnames(pred)) pred[v, ] <- 0
   }
   
   meth <- rep("", ncol(data))
   names(meth) <- colnames(data)
-  
-  meth[cont_preds] <- "pmm"
-  meth[factor_preds] <- "logreg"
+  meth[cont_preds]          <- "pmm"
+  meth[factor_preds]        <- "logreg"
   meth[predictor_only_vars] <- ""
-  meth[weight_col] <- ""
+  meth[weight_col]          <- ""
   
   list(method = meth, predictorMatrix = pred)
 }
@@ -1052,6 +1087,8 @@ extract_imputed <- function(imp_list, pv_cols, m) {
   })
 }
 
+# Wrapper that runs the full MI pipeline (test run + full imputation +
+# validation diagnostics) for one branch of the sensitivity analysis.
 run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
                          label = "withQ", m_test = 5, maxit_test = 5,
                          m_full = 40, maxit_full = 20, seed_base = 2012) {
@@ -1060,45 +1097,35 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
   cat("Running MI branch:", label, "\n")
   cat("====================================================\n")
   
-  # ---------------------------------------------------------------------------
-  # Quick test run
-  # ---------------------------------------------------------------------------
+  # ---- Quick test run ------------------------------------------------------
   
-  cat("\n--- Test run:", label, "| PV1, Norway 2012, m =", m_test, ", maxit =", maxit_test, "---\n")
+  cat("\n--- Test run:", label, "| PV1, Norway 2012, m =", m_test,
+      ", maxit =", maxit_test, "---\n")
   set.seed(seed_base)
-  test_imp_nor <- mice(
-    pv_data_nor[[1]],
-    m               = m_test,
-    maxit           = maxit_test,
-    method          = config$method,
-    predictorMatrix = config$predictorMatrix,
-    printFlag       = TRUE
-  )
+  test_imp_nor <- mice(pv_data_nor[[1]],
+                       m = m_test, maxit = maxit_test,
+                       method          = config$method,
+                       predictorMatrix = config$predictorMatrix,
+                       printFlag       = TRUE)
   cat("Norway test passed — no fatal errors\n")
   
-  cat("\n--- Test run:", label, "| PV1, Finland 2012, m =", m_test, ", maxit =", maxit_test, "---\n")
+  cat("\n--- Test run:", label, "| PV1, Finland 2012, m =", m_test,
+      ", maxit =", maxit_test, "---\n")
   set.seed(seed_base)
-  test_imp_fin <- mice(
-    pv_data_fin[[1]],
-    m               = m_test,
-    maxit           = maxit_test,
-    method          = config$method,
-    predictorMatrix = config$predictorMatrix,
-    printFlag       = TRUE
-  )
+  test_imp_fin <- mice(pv_data_fin[[1]],
+                       m = m_test, maxit = maxit_test,
+                       method          = config$method,
+                       predictorMatrix = config$predictorMatrix,
+                       printFlag       = TRUE)
   cat("Finland test passed — no fatal errors\n")
   
-  cat("\n--- Logged events: Norway |", label, "---\n")
-  print(test_imp_nor$loggedEvents)
+  cat("\n--- Logged events: Norway |", label, "---\n"); print(test_imp_nor$loggedEvents)
+  cat("\n--- Logged events: Finland |", label, "---\n"); print(test_imp_fin$loggedEvents)
   
-  cat("\n--- Logged events: Finland |", label, "---\n")
-  print(test_imp_fin$loggedEvents)
+  # ---- Full imputation — Norway --------------------------------------------
   
-  # ---------------------------------------------------------------------------
-  # Full imputation — Norway
-  # ---------------------------------------------------------------------------
-  
-  cat("\n--- Full imputation:", label, "| Norway 2012 (", length(pv_cols), " PVs x m =", m_full, ") ---\n")
+  cat("\n--- Full imputation:", label, "| Norway 2012 (",
+      length(pv_cols), " PVs x m =", m_full, ") ---\n")
   
   imp_nor_list <- vector("list", length(pv_cols))
   names(imp_nor_list) <- pv_cols
@@ -1106,24 +1133,20 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
   for (i in seq_along(pv_cols)) {
     cat("\n  Norway 2012 |", label, "| PV", i, "of", length(pv_cols), "\n")
     set.seed(seed_base + i)
-    imp_nor_list[[i]] <- mice(
-      pv_data_nor[[i]],
-      m               = m_full,
-      maxit           = maxit_full,
-      method          = config$method,
-      predictorMatrix = config$predictorMatrix,
-      printFlag       = FALSE
-    )
+    imp_nor_list[[i]] <- mice(pv_data_nor[[i]],
+                              m = m_full, maxit = maxit_full,
+                              method          = config$method,
+                              predictorMatrix = config$predictorMatrix,
+                              printFlag       = FALSE)
   }
   
   cat("\nNorway imputation complete —", label, "\n")
   cat("Imputed datasets:", length(imp_nor_list) * m_full, "\n")
   
-  # ---------------------------------------------------------------------------
-  # Full imputation — Finland
-  # ---------------------------------------------------------------------------
+  # ---- Full imputation — Finland -------------------------------------------
   
-  cat("\n--- Full imputation:", label, "| Finland 2012 (", length(pv_cols), " PVs x m =", m_full, ") ---\n")
+  cat("\n--- Full imputation:", label, "| Finland 2012 (",
+      length(pv_cols), " PVs x m =", m_full, ") ---\n")
   
   imp_fin_list <- vector("list", length(pv_cols))
   names(imp_fin_list) <- pv_cols
@@ -1131,22 +1154,17 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
   for (i in seq_along(pv_cols)) {
     cat("\n  Finland 2012 |", label, "| PV", i, "of", length(pv_cols), "\n")
     set.seed(seed_base + i)
-    imp_fin_list[[i]] <- mice(
-      pv_data_fin[[i]],
-      m               = m_full,
-      maxit           = maxit_full,
-      method          = config$method,
-      predictorMatrix = config$predictorMatrix,
-      printFlag       = FALSE
-    )
+    imp_fin_list[[i]] <- mice(pv_data_fin[[i]],
+                              m = m_full, maxit = maxit_full,
+                              method          = config$method,
+                              predictorMatrix = config$predictorMatrix,
+                              printFlag       = FALSE)
   }
   
   cat("\nFinland imputation complete —", label, "\n")
   cat("Imputed datasets:", length(imp_fin_list) * m_full, "\n")
   
-  # ---------------------------------------------------------------------------
-  # Validation
-  # ---------------------------------------------------------------------------
+  # ---- Validation: convergence and density diagnostics ---------------------
   
   cat("\n--- Convergence plots: Norway 2012 (PV1) |", label, "---\n")
   plot(imp_nor_list[[1]],
@@ -1168,33 +1186,28 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
     print(densityplot(imp_fin_list[[1]], as.formula(paste("~", v))))
   }
   
-  # LANGN proportions
-  cat("\n--- LANGN imputed proportions: Norway |", label, "---\n")
-  nor_langn_props <- sapply(1:m_full, function(j) {
-    dat <- complete(imp_nor_list[[1]], j)
-    prop.table(table(dat$LANGN))
-  })
-  print(round(nor_langn_props, 3))
+  # ---- LANGN imputed proportions (sanity check) ----------------------------
   
+  cat("\n--- LANGN imputed proportions: Norway |", label, "---\n")
+  nor_langn_props <- sapply(1:m_full, function(j)
+    prop.table(table(complete(imp_nor_list[[1]], j)$LANGN)))
+  print(round(nor_langn_props, 3))
   cat("\n--- LANGN observed proportion: Norway ---\n")
   print(round(prop.table(table(STU_NOR_12$LANGN, useNA = "no")), 3))
   
   cat("\n--- LANGN imputed proportions: Finland |", label, "---\n")
-  fin_langn_props <- sapply(1:m_full, function(j) {
-    dat <- complete(imp_fin_list[[1]], j)
-    prop.table(table(dat$LANGN))
-  })
+  fin_langn_props <- sapply(1:m_full, function(j)
+    prop.table(table(complete(imp_fin_list[[1]], j)$LANGN)))
   print(round(fin_langn_props, 3))
-  
   cat("\n--- LANGN observed proportion: Finland ---\n")
   print(round(prop.table(table(STU_FIN_12$LANGN, useNA = "no")), 3))
   
-  # Missing values after imputation
+  # ---- Zero-missingness check across all imputed datasets ------------------
+  
   cat("\n--- Missing values after imputation: Norway |", label, "---\n")
   nor_missing <- sapply(seq_along(pv_cols), function(i) {
-    sapply(1:m_full, function(j) {
-      sum(is.na(complete(imp_nor_list[[i]], j)[, final_preds_12]))
-    })
+    sapply(1:m_full, function(j)
+      sum(is.na(complete(imp_nor_list[[i]], j)[, final_preds_12])))
   })
   colnames(nor_missing) <- pv_cols
   rownames(nor_missing) <- paste0("imp_", 1:m_full)
@@ -1203,18 +1216,15 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
   
   cat("\n--- Missing values after imputation: Finland |", label, "---\n")
   fin_missing <- sapply(seq_along(pv_cols), function(i) {
-    sapply(1:m_full, function(j) {
-      sum(is.na(complete(imp_fin_list[[i]], j)[, final_preds_12]))
-    })
+    sapply(1:m_full, function(j)
+      sum(is.na(complete(imp_fin_list[[i]], j)[, final_preds_12])))
   })
   colnames(fin_missing) <- pv_cols
   rownames(fin_missing) <- paste0("imp_", 1:m_full)
   print(fin_missing)
   cat("All zero?", all(fin_missing == 0), "\n")
   
-  # ---------------------------------------------------------------------------
-  # Extract imputed datasets
-  # ---------------------------------------------------------------------------
+  # ---- Extract imputed datasets --------------------------------------------
   
   imp_datasets_nor <- extract_imputed(imp_nor_list, pv_cols, m = m_full)
   imp_datasets_fin <- extract_imputed(imp_fin_list, pv_cols, m = m_full)
@@ -1227,7 +1237,8 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
       length(imp_datasets_fin[[1]]), "imputations =",
       length(imp_datasets_fin) * length(imp_datasets_fin[[1]]), "total datasets\n")
   
-  # Column structure
+  # ---- Column-structure consistency ----------------------------------------
+  
   cat("\n--- Column names (should be identical across all datasets) |", label, "---\n")
   print(names(imp_datasets_nor[[1]][[1]]))
   
@@ -1241,10 +1252,11 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
       identical(names(imp_datasets_fin[[i]][[j]]),
                 names(imp_datasets_nor[[1]][[1]])))))
   
-  cat("Column structure consistent — Norway:", nor_cols_consistent, "\n")
+  cat("Column structure consistent — Norway:",  nor_cols_consistent, "\n")
   cat("Column structure consistent — Finland:", fin_cols_consistent, "\n")
   
-  # Average predictor means
+  # ---- Predictor means across all 200 datasets vs observed -----------------
+  
   cat("\n--- Average predictor means across all datasets: Norway |", label, "---\n")
   nor_means <- Reduce("+", lapply(seq_along(pv_cols), function(i)
     Reduce("+", lapply(1:m_full, function(j)
@@ -1259,24 +1271,21 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
     (length(pv_cols) * m_full)
   print(round(fin_means, 3))
   
-  # Compare against observed means
   cat("\n--- Observed predictor means (available cases): Norway ---\n")
   print(round(colMeans(STU_NOR_12[, final_cont_preds_12], na.rm = TRUE), 3))
-  
   cat("\n--- Observed predictor means (available cases): Finland ---\n")
   print(round(colMeans(STU_FIN_12[, final_cont_preds_12], na.rm = TRUE), 3))
   
-  # Row counts
+  # ---- Row-count consistency ----------------------------------------------
+  
   cat("\n--- Row counts consistent: Norway |", label, "---\n")
   nor_rows <- all(sapply(seq_along(pv_cols), function(i)
-    sapply(1:m_full, function(j)
-      nrow(imp_datasets_nor[[i]][[j]]) == nrow(STU_NOR_12))))
+    sapply(1:m_full, function(j) nrow(imp_datasets_nor[[i]][[j]]) == nrow(STU_NOR_12))))
   cat("All datasets have", nrow(STU_NOR_12), "rows:", nor_rows, "\n")
   
   cat("\n--- Row counts consistent: Finland |", label, "---\n")
   fin_rows <- all(sapply(seq_along(pv_cols), function(i)
-    sapply(1:m_full, function(j)
-      nrow(imp_datasets_fin[[i]][[j]]) == nrow(STU_FIN_12))))
+    sapply(1:m_full, function(j) nrow(imp_datasets_fin[[i]][[j]]) == nrow(STU_FIN_12))))
   cat("All datasets have", nrow(STU_FIN_12), "rows:", fin_rows, "\n")
   
   list(
@@ -1292,10 +1301,10 @@ run_mi_block <- function(pv_data_nor, pv_data_fin, pv_cols, config,
 }
 
 # ------------------------------------------------------------------------------
-# Step 15A: Prepare inputs — WITH QuestID
+# 10.2  Configuration — Branch A (with QuestID as auxiliary predictor)
 # ------------------------------------------------------------------------------
 
-base_cols_12_withQ <- c(final_preds_12, "W_FSTUWT", "QuestID")
+base_cols_12_withQ <- c(final_preds_12, "QuestID", "W_FSTUWT")
 
 stopifnot(all(base_cols_12_withQ %in% names(STU_NOR_12)))
 stopifnot(all(base_cols_12_withQ %in% names(STU_FIN_12)))
@@ -1304,10 +1313,10 @@ pv_data_nor_12_withQ <- make_pv_datasets(STU_NOR_12, pv_cols, base_cols_12_withQ
 pv_data_fin_12_withQ <- make_pv_datasets(STU_FIN_12, pv_cols, base_cols_12_withQ)
 
 cat("\n--- PV datasets prepared: 2012 | with QuestID ---\n")
-cat("Norway: ", length(pv_data_nor_12_withQ), "datasets, each with",
+cat("Norway: ",  length(pv_data_nor_12_withQ), "datasets, each with",
     ncol(pv_data_nor_12_withQ[[1]]), "columns and",
     nrow(pv_data_nor_12_withQ[[1]]), "rows\n")
-cat("Finland:", length(pv_data_fin_12_withQ), "datasets, each with",
+cat("Finland:",  length(pv_data_fin_12_withQ), "datasets, each with",
     ncol(pv_data_fin_12_withQ[[1]]), "columns and",
     nrow(pv_data_fin_12_withQ[[1]]), "rows\n")
 
@@ -1325,14 +1334,14 @@ config_12_withQ_fin <- build_imp_config(
   predictor_only_vars = c("PV_MATH", "QuestID")
 )
 
+# Sanity check: configurations should match across countries
 cat("\n--- Methods identical across countries? | with QuestID ---\n")
 print(all(config_12_withQ$method == config_12_withQ_fin$method))
-
 cat("\n--- Predictor matrices identical across countries? | with QuestID ---\n")
 print(all(config_12_withQ$predictorMatrix == config_12_withQ_fin$predictorMatrix))
 
 # ------------------------------------------------------------------------------
-# Step 15B: Prepare inputs — WITHOUT QuestID
+# 10.3  Configuration — Branch B (without QuestID)
 # ------------------------------------------------------------------------------
 
 base_cols_12_noQ <- c(final_preds_12, "W_FSTUWT")
@@ -1344,10 +1353,10 @@ pv_data_nor_12_noQ <- make_pv_datasets(STU_NOR_12, pv_cols, base_cols_12_noQ)
 pv_data_fin_12_noQ <- make_pv_datasets(STU_FIN_12, pv_cols, base_cols_12_noQ)
 
 cat("\n--- PV datasets prepared: 2012 | without QuestID ---\n")
-cat("Norway: ", length(pv_data_nor_12_noQ), "datasets, each with",
+cat("Norway: ",  length(pv_data_nor_12_noQ), "datasets, each with",
     ncol(pv_data_nor_12_noQ[[1]]), "columns and",
     nrow(pv_data_nor_12_noQ[[1]]), "rows\n")
-cat("Finland:", length(pv_data_fin_12_noQ), "datasets, each with",
+cat("Finland:",  length(pv_data_fin_12_noQ), "datasets, each with",
     ncol(pv_data_fin_12_noQ[[1]]), "columns and",
     nrow(pv_data_fin_12_noQ[[1]]), "rows\n")
 
@@ -1365,14 +1374,14 @@ config_12_noQ_fin <- build_imp_config(
   predictor_only_vars = "PV_MATH"
 )
 
+# Sanity check: configurations should match across countries
 cat("\n--- Methods identical across countries? | without QuestID ---\n")
 print(all(config_12_noQ$method == config_12_noQ_fin$method))
-
 cat("\n--- Predictor matrices identical across countries? | without QuestID ---\n")
 print(all(config_12_noQ$predictorMatrix == config_12_noQ_fin$predictorMatrix))
 
 # ------------------------------------------------------------------------------
-# Step 17–21: Run both MI branches
+# 10.4  Run both MI branches
 # ------------------------------------------------------------------------------
 
 mi_2012_withQ <- run_mi_block(
@@ -1406,11 +1415,12 @@ mi_2012_noQ <- run_mi_block(
 saveRDS(mi_2012_noQ, "mi_2012_noQ.rds")
 
 # ------------------------------------------------------------------------------
-# Comparison summary
+# 10.5  Compare branches and select final imputed datasets
 # ------------------------------------------------------------------------------
 
+# Reload from disk so the comparison block can be re-run independently
 mi_2012_withQ <- readRDS("mi_2012_withQ.rds")
-mi_2012_noQ <- readRDS("mi_2012_noQ.rds")
+mi_2012_noQ   <- readRDS("mi_2012_noQ.rds")
 
 cat("\n====================================================\n")
 cat("Comparison summary: withQ vs noQ\n")
@@ -1418,17 +1428,16 @@ cat("====================================================\n")
 
 cat("\n--- Unique logged-event predictors: Norway | withQ ---\n")
 print(unique(mi_2012_withQ$test_imp_nor$loggedEvents$out))
-
 cat("\n--- Unique logged-event predictors: Finland | withQ ---\n")
 print(unique(mi_2012_withQ$test_imp_fin$loggedEvents$out))
 
 cat("\n--- Logged events: Norway | noQ ---\n")
 print(mi_2012_noQ$test_imp_nor$loggedEvents)
-
 cat("\n--- Logged events: Finland | noQ ---\n")
 print(mi_2012_noQ$test_imp_fin$loggedEvents)
 
-# Final model: noQ selected based on convergence and sensitivity analysis
+# Final decision: noQ branch selected based on convergence behaviour and
+# downstream stability (full justification in methods chapter).
 imp_datasets_nor_12 <- mi_2012_noQ$imp_datasets_nor
 imp_datasets_fin_12 <- mi_2012_noQ$imp_datasets_fin
 
@@ -1438,20 +1447,30 @@ cat("Finland: 200 datasets (5 PVs x 40 imputations)\n")
 cat("Model: noQ branch (QuestID excluded from imputation model)\n")
 
 # ==============================================================================
-# Analysis script — PISA 2012
-# Pooling structure:
-#   Stage 1: MIcombine across m imputations within each PV
-#   Stage 2: PV combination rules across pooled PV estimates
+# 11. Pooled regression analysis
 # ==============================================================================
+#
+# Pooling structure
+# -----------------
+#   Stage 1 (within PV)    — Rubin's rules across the m imputations using
+#                            MIcombine() to obtain a pooled coefficient vector
+#                            and variance–covariance matrix per PV.
+#                            Rubin's (1 + 1/m) factor uses true m = 40.
+#   Stage 2 (across PVs)   — PV combination rules (NAEP/PISA) applied to the
+#                            Q pooled per-PV estimates: the final point
+#                            estimate is the mean across PVs; the final
+#                            variance is mean(within) + (1 + 1/Q) * between.
+#                            avg_pv_var captures sampling + MI uncertainty
+#                            within each PV; between_var captures measurement
+#                            uncertainty across plausible values.
 
 # ------------------------------------------------------------------------------
-# Step 1: Add replicate weights back to imputed datasets
-# Guard against duplicate columns if function is called more than once
+# 11.1  Helper functions
 # ------------------------------------------------------------------------------
 
-rw_nor_12 <- STU_NOR_12[, w_reps]
-rw_fin_12 <- STU_FIN_12[, w_reps]
-
+# Re-attach replicate weights to imputed data (mice strips columns it doesn't
+# need to impute, so the replicate weights must be added back for survey
+# variance estimation).
 add_replicate_weights <- function(imp_datasets, rw, w_reps) {
   lapply(imp_datasets, function(pv_list) {
     lapply(pv_list, function(dat) {
@@ -1462,122 +1481,7 @@ add_replicate_weights <- function(imp_datasets, rw, w_reps) {
   })
 }
 
-imp_datasets_nor_12 <- add_replicate_weights(imp_datasets_nor_12, rw_nor_12, w_reps)
-imp_datasets_fin_12 <- add_replicate_weights(imp_datasets_fin_12, rw_fin_12, w_reps)
-
-cat("\n--- Replicate weights added ---\n")
-cat("Norway columns:", ncol(imp_datasets_nor_12[[1]][[1]]), "\n")
-cat("W_FSTR1 present:", "W_FSTR1" %in% names(imp_datasets_nor_12[[1]][[1]]), "\n")
-cat("W_FSTR80 present:", "W_FSTR80" %in% names(imp_datasets_nor_12[[1]][[1]]), "\n")
-
-# ------------------------------------------------------------------------------
-# Step 2: Define regression formula and BRR design builder
-# ------------------------------------------------------------------------------
-
-reg_formula_12 <- PV_MATH ~ ESCS + LANGN + MATHEFF + ANXMAT + TEACHSUP
-
-make_brr_design_12 <- function(dat) {
-  svrepdesign(
-    weights          = ~ W_FSTUWT,
-    repweights       = as.matrix(dat[, w_reps]),
-    data             = dat,
-    type             = "BRR",
-    fay.rho          = 0.5,
-    combined.weights = TRUE,
-    mse              = TRUE
-  )
-}
-
-# ------------------------------------------------------------------------------
-# Step 3: Nested two-stage regression pooling
-#
-# Stage 1: within each PV, pool m imputations using MIcombine
-#          Rubin's correction factor (1 + 1/m) uses true m = 40
-#          Result per PV: pooled coefficient vector + variance-covariance matrix
-#
-# Stage 2: combine Q pooled PV estimates using PV combination rules
-#          point estimate = mean of Q PV estimates
-#          total variance = avg_pv_var + (1 + 1/Q) * between_var
-#          where avg_pv_var = average variance of PV-specific pooled estimates
-#          (already contains sampling variance + MI uncertainty within each PV)
-#          and between_var = variance of coefficients across PVs
-#          (captures measurement uncertainty from plausible values)
-# ------------------------------------------------------------------------------
-
-pool_regression_nested <- function(imp_datasets, formula, label) {
-  
-  cat("\n--- Running nested regression pipeline:", label, "---\n")
-  
-  Q <- length(imp_datasets)
-  m <- length(imp_datasets[[1]])
-  
-  cat("PVs:", Q, "| Imputations per PV:", m, "\n")
-  
-  # Stage 1: pool m imputations within each PV
-  pv_coefs <- vector("list", Q)
-  pv_vcovs <- vector("list", Q)
-  
-  for (i in seq_len(Q)) {
-    cat("  Stage 1 — PV", i, "of", Q, ": fitting", m, "models\n")
-    
-    pv_models <- lapply(imp_datasets[[i]], function(dat) {
-      design <- make_brr_design_12(dat)
-      svyglm(formula, design = design, family = gaussian())
-    })
-    
-    pooled_pv     <- MIcombine(pv_models)
-    pv_coefs[[i]] <- coef(pooled_pv)
-    pv_vcovs[[i]] <- vcov(pooled_pv)
-  }
-  
-  # Verify coefficient names are consistent across all PVs
-  stopifnot(all(sapply(pv_coefs, function(x)
-    identical(names(x), names(pv_coefs[[1]])))))
-  
-  # Stage 2: combine Q PV estimates
-  cat("\n  Stage 2 — combining", Q, "PV estimates\n")
-  
-  coef_mat <- do.call(rbind, pv_coefs)
-  var_mat  <- do.call(rbind, lapply(pv_vcovs, diag))
-  
-  # Final point estimates
-  final_coefs <- colMeans(coef_mat)
-  
-  # Total variance
-  avg_pv_var  <- colMeans(var_mat)
-  between_var <- apply(coef_mat, 2, var)
-  total_var   <- avg_pv_var + (1 + 1/Q) * between_var
-  final_se    <- sqrt(total_var)
-  
-  cat("Nested pooling complete —", label, "\n")
-  
-  list(
-    coefficients = final_coefs,
-    se           = final_se,
-    total_var    = total_var,
-    avg_pv_var   = avg_pv_var,
-    between_var  = between_var,
-    n_pv         = Q,
-    n_imp        = m
-  )
-}
-
-reg_nor_12 <- pool_regression_nested(
-  imp_datasets_nor_12, reg_formula_12, "Norway 2012"
-)
-
-reg_fin_12 <- pool_regression_nested(
-  imp_datasets_fin_12, reg_formula_12, "Finland 2012"
-)
-
-# ------------------------------------------------------------------------------
-# Step 4: Format regression results
-# p-values use normal approximation — appropriate after two-stage pooling
-# where final df does not reduce to a simple formula
-# ------------------------------------------------------------------------------
-
 format_reg_results <- function(reg, country, cycle) {
-  
   coefs  <- reg$coefficients
   se     <- reg$se
   z_vals <- coefs / se
@@ -1596,24 +1500,138 @@ format_reg_results <- function(reg, country, cycle) {
   )
 }
 
+# ------------------------------------------------------------------------------
+# 11.2  Add replicate weights to imputed datasets
+# ------------------------------------------------------------------------------
+
+rw_nor_12 <- STU_NOR_12[, w_reps]
+rw_fin_12 <- STU_FIN_12[, w_reps]
+
+imp_datasets_nor_12 <- add_replicate_weights(imp_datasets_nor_12, rw_nor_12, w_reps)
+imp_datasets_fin_12 <- add_replicate_weights(imp_datasets_fin_12, rw_fin_12, w_reps)
+
+cat("\n--- Replicate weights added: 2012 ---\n")
+
+cat("Norway columns:", ncol(imp_datasets_nor_12[[1]][[1]]), "\n")
+cat("Norway W_FSTR1 present:",
+    "W_FSTR1"  %in% names(imp_datasets_nor_12[[1]][[1]]), "\n")
+cat("Norway W_FSTR80 present:",
+    "W_FSTR80" %in% names(imp_datasets_nor_12[[1]][[1]]), "\n")
+
+cat("\nFinland columns:", ncol(imp_datasets_fin_12[[1]][[1]]), "\n")
+cat("Finland W_FSTR1 present:",
+    "W_FSTR1"  %in% names(imp_datasets_fin_12[[1]][[1]]), "\n")
+cat("Finland W_FSTR80 present:",
+    "W_FSTR80" %in% names(imp_datasets_fin_12[[1]][[1]]), "\n")
+
+# ------------------------------------------------------------------------------
+# 11.3  Regression formula and BRR design builder
+# ------------------------------------------------------------------------------
+
+reg_formula_12 <- PV_MATH ~ ESCS + LANGN + MATHEFF + ANXMAT + TEACHSUP
+
+make_brr_design_12_imp <- function(dat) {
+  svrepdesign(
+    weights          = ~ W_FSTUWT,
+    repweights       = as.matrix(dat[, w_reps]),
+    data             = dat,
+    type             = "BRR",
+    fay.rho          = 0.5,
+    combined.weights = TRUE,
+    mse              = TRUE
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 11.4  Two-stage pooling
+# ------------------------------------------------------------------------------
+
+pool_regression_nested_12 <- function(imp_datasets, formula, label) {
+  
+  cat("\n--- Running nested regression pipeline:", label, "---\n")
+  
+  Q <- length(imp_datasets)
+  m <- length(imp_datasets[[1]])
+  cat("PVs:", Q, "| Imputations per PV:", m, "\n")
+  
+  pv_coefs <- vector("list", Q)
+  pv_vcovs <- vector("list", Q)
+  
+  # Stage 1: pool m imputations within each PV via MIcombine()
+  for (i in seq_len(Q)) {
+    cat("  Stage 1 — PV", i, "of", Q, ": fitting", m, "models\n")
+    
+    pv_models <- lapply(imp_datasets[[i]], function(dat) {
+      design <- make_brr_design_12_imp(dat)
+      svyglm(formula, design = design, family = gaussian())
+    })
+    
+    pooled_pv     <- MIcombine(pv_models)
+    pv_coefs[[i]] <- coef(pooled_pv)
+    pv_vcovs[[i]] <- vcov(pooled_pv)
+  }
+  
+  # Verify coefficient names are consistent across PVs
+  stopifnot(all(sapply(pv_coefs, function(x)
+    identical(names(x), names(pv_coefs[[1]])))))
+  
+  # Verify vcov column names are consistent across PVs
+  stopifnot(all(sapply(pv_vcovs, function(x)
+    identical(colnames(x), colnames(pv_vcovs[[1]])))))
+  
+  # Stage 2: combine across PVs using PV combination rules
+  cat("\n  Stage 2 — combining", Q, "PV estimates\n")
+  
+  coef_mat <- do.call(rbind, pv_coefs)
+  var_mat  <- do.call(rbind, lapply(pv_vcovs, diag))
+  
+  final_coefs <- colMeans(coef_mat)
+  avg_pv_var  <- colMeans(var_mat)
+  between_var <- apply(coef_mat, 2, var)
+  total_var   <- avg_pv_var + (1 + 1/Q) * between_var
+  final_se    <- sqrt(total_var)
+  
+  cat("Nested pooling complete —", label, "\n")
+  
+  list(
+    coefficients = final_coefs,
+    se           = final_se,
+    total_var    = total_var,
+    avg_pv_var   = avg_pv_var,
+    between_var  = between_var,
+    n_pv         = Q,
+    n_imp        = m
+  )
+}
+
+reg_nor_12 <- pool_regression_nested_12(imp_datasets_nor_12, reg_formula_12, "Norway 2012")
+reg_fin_12 <- pool_regression_nested_12(imp_datasets_fin_12, reg_formula_12, "Finland 2012")
+
+# ------------------------------------------------------------------------------
+# 11.5  Format regression results
+# ------------------------------------------------------------------------------
+# p-values use the normal approximation (appropriate after two-stage pooling
+# where the final degrees-of-freedom does not reduce to a simple closed form).
+
 reg_results_nor_12 <- format_reg_results(reg_nor_12, "NOR", 2012)
 reg_results_fin_12 <- format_reg_results(reg_fin_12, "FIN", 2012)
 reg_results_12     <- rbind(reg_results_nor_12, reg_results_fin_12)
 
 cat("\n--- Pooled regression results: Norway 2012 ---\n")
 print(reg_results_nor_12)
-
 cat("\n--- Pooled regression results: Finland 2012 ---\n")
 print(reg_results_fin_12)
 
-# ------------------------------------------------------------------------------
-# Step 5: Compute pooled weighted means for OBD endowments
-# For OBD input, only pooled point estimates are needed.
-# Weighted means are averaged across all PV x imputation datasets.
-# No pooled variance or significance testing is computed for these means here.
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 12. Pooled weighted means (point estimates for OBD)
+# ==============================================================================
 
-compute_pooled_means <- function(imp_datasets, cont_preds, label) {
+# For the Oaxaca–Blinder decomposition, only pooled point estimates of the
+# predictor and outcome means are required as inputs. Means are computed under
+# the BRR design for each of the 200 datasets and then averaged. Variance and
+# inference for the means are computed separately in Section 13.
+
+compute_pooled_means_12 <- function(imp_datasets, cont_preds, label) {
   
   cat("\n--- Computing weighted means:", label, "---\n")
   
@@ -1623,23 +1641,22 @@ compute_pooled_means <- function(imp_datasets, cont_preds, label) {
     for (j in seq_along(imp_datasets[[i]])) {
       
       dat    <- imp_datasets[[i]][[j]]
-      design <- make_brr_design_12(dat)
+      design <- make_brr_design_12_imp(dat)
       
       # Continuous predictor means
       cont_means <- as.numeric(
-        svymean(as.formula(paste("~",
-                                 paste(cont_preds, collapse = " + "))),
+        svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))),
                 design, na.rm = TRUE)
       )
       names(cont_means) <- cont_preds
       
-      # LANGN: explicitly name levels to avoid mislabelling
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      langn_mean <- as.numeric(langn_obj)
-      names(langn_mean) <- c("LANGN_Majority", "LANGN_Other")
+      # LANGN: use names returned by svymean to avoid mislabelling
+      langn_obj         <- svymean(~ LANGN, design, na.rm = TRUE)
+      langn_mean        <- as.numeric(langn_obj)
+      names(langn_mean) <- names(coef(langn_obj))
       
       # Outcome mean
-      outcome_mean <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
+      outcome_mean        <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
       names(outcome_mean) <- "PV_MATH"
       
       all_means[[length(all_means) + 1]] <-
@@ -1655,19 +1672,18 @@ compute_pooled_means <- function(imp_datasets, cont_preds, label) {
   pooled_means
 }
 
-pooled_means_nor_12 <- compute_pooled_means(
-  imp_datasets_nor_12, final_cont_preds_12, "Norway 2012"
-)
+pooled_means_nor_12 <- compute_pooled_means_12(imp_datasets_nor_12,
+                                               final_cont_preds_12,
+                                               "Norway 2012")
+pooled_means_fin_12 <- compute_pooled_means_12(imp_datasets_fin_12,
+                                               final_cont_preds_12,
+                                               "Finland 2012")
 
-pooled_means_fin_12 <- compute_pooled_means(
-  imp_datasets_fin_12, final_cont_preds_12, "Finland 2012"
-)
+# Verify names are aligned before building table
+stopifnot(identical(names(pooled_means_nor_12), names(pooled_means_fin_12)))
 
-cat("\n--- Pooled weighted means: Norway 2012 ---\n")
-print(round(pooled_means_nor_12, 4))
-
-cat("\n--- Pooled weighted means: Finland 2012 ---\n")
-print(round(pooled_means_fin_12, 4))
+cat("\n--- Pooled weighted means: Norway 2012 ---\n");  print(round(pooled_means_nor_12, 4))
+cat("\n--- Pooled weighted means: Finland 2012 ---\n"); print(round(pooled_means_fin_12, 4))
 
 means_table_12 <- data.frame(
   variable           = names(pooled_means_nor_12),
@@ -1680,10 +1696,7 @@ means_table_12 <- data.frame(
 cat("\n--- Means comparison table: 2012 ---\n")
 print(means_table_12)
 
-# ------------------------------------------------------------------------------
-# Step 6: Export to CSV for Excel OBD calculation
-# ------------------------------------------------------------------------------
-
+# Export for use in the Excel-based OBD calculation
 write.csv(reg_results_12, "reg_results_2012.csv", row.names = FALSE)
 write.csv(means_table_12, "means_table_2012.csv", row.names = FALSE)
 
@@ -1691,15 +1704,15 @@ cat("\n--- Files saved ---\n")
 cat("reg_results_2012.csv\n")
 cat("means_table_2012.csv\n")
 
-# plot(mi_2012_noQ$imp_nor_list[[1]])
-# plot(mi_2012_noQ$imp_fin_list[[1]])
-
 # ==============================================================================
-# Extract pooled weighted means WITH standard errors — PISA 2012
+# 13. Pooled means with standard errors (for cross-cycle inference)
 # ==============================================================================
 
-# Note: uses make_brr_design_12 and imp_datasets_nor_12 / imp_datasets_fin_12
-# Reuse the same compute_pooled_means_with_se function but with 2012 design
+# Required to test whether the within-country shift in any predictor's mean
+# from 2012 to 2022 (X_22 - X_12) is statistically significant. Pooling
+# structure mirrors that used for the regression coefficients in Section 11:
+#   Stage 1 — Rubin's rules within each PV, using BRR design-based SEs.
+#   Stage 2 — PV combination rules across the Q pooled per-PV estimates.
 
 compute_pooled_means_with_se_12 <- function(imp_datasets, cont_preds, label) {
   
@@ -1713,21 +1726,24 @@ compute_pooled_means_with_se_12 <- function(imp_datasets, cont_preds, label) {
   
   for (i in seq_len(Q)) {
     
+    # Storage: rows = imputations within this PV, columns = variables
     imp_means <- matrix(NA, nrow = m, ncol = length(cont_preds) + 3)
     
+    # First pass: collect point estimates from each imputation
     for (j in seq_len(m)) {
       dat    <- imp_datasets[[i]][[j]]
-      design <- make_brr_design_12(dat)
+      design <- make_brr_design_12_imp(dat)
       
-      cont_obj   <- svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))), design, na.rm = TRUE)
-      cont_est   <- as.numeric(cont_obj)
+      cont_obj        <- svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))),
+                                 design, na.rm = TRUE)
+      cont_est        <- as.numeric(cont_obj)
       names(cont_est) <- cont_preds
       
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      langn_est  <- as.numeric(langn_obj)
+      langn_obj        <- svymean(~ LANGN, design, na.rm = TRUE)
+      langn_est        <- as.numeric(langn_obj)
       names(langn_est) <- names(coef(langn_obj))
       
-      pv_est <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
+      pv_est        <- as.numeric(svymean(~ PV_MATH, design, na.rm = TRUE))
       names(pv_est) <- "PV_MATH"
       
       imp_means[j, ] <- c(cont_est, langn_est, pv_est)
@@ -1735,22 +1751,26 @@ compute_pooled_means_with_se_12 <- function(imp_datasets, cont_preds, label) {
     
     var_names <- c(cont_preds, names(coef(langn_obj)), "PV_MATH")
     colnames(imp_means) <- var_names
+    
+    # Stage 1: within-PV pooling via Rubin's rules
     pv_means_list[[i]] <- colMeans(imp_means)
     
+    # Second pass: collect BRR-based SEs from each imputation
     imp_ses <- matrix(NA, nrow = m, ncol = length(var_names))
     colnames(imp_ses) <- var_names
     
     for (j in seq_len(m)) {
       dat    <- imp_datasets[[i]][[j]]
-      design <- make_brr_design_12(dat)
+      design <- make_brr_design_12_imp(dat)
       
-      cont_obj   <- svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))), design, na.rm = TRUE)
-      langn_obj  <- svymean(~ LANGN, design, na.rm = TRUE)
-      pv_obj     <- svymean(~ PV_MATH, design, na.rm = TRUE)
+      cont_obj  <- svymean(as.formula(paste("~", paste(cont_preds, collapse = " + "))),
+                           design, na.rm = TRUE)
+      langn_obj <- svymean(~ LANGN, design, na.rm = TRUE)
+      pv_obj    <- svymean(~ PV_MATH, design, na.rm = TRUE)
       
       imp_ses[j, cont_preds]             <- SE(cont_obj)
       imp_ses[j, names(coef(langn_obj))] <- SE(langn_obj)
-      imp_ses[j, "PV_MATH"]             <- SE(pv_obj)
+      imp_ses[j, "PV_MATH"]              <- SE(pv_obj)
     }
     
     within_var  <- colMeans(imp_ses^2)
@@ -1758,10 +1778,10 @@ compute_pooled_means_with_se_12 <- function(imp_datasets, cont_preds, label) {
     total_var   <- within_var + (1 + 1/m) * between_var
     
     pv_vars_list[[i]] <- total_var
-    
     cat("  PV", i, "complete\n")
   }
   
+  # Stage 2: combine across PVs
   means_mat <- do.call(rbind, pv_means_list)
   vars_mat  <- do.call(rbind, pv_vars_list)
   
@@ -1774,29 +1794,26 @@ compute_pooled_means_with_se_12 <- function(imp_datasets, cont_preds, label) {
   cat("Done —", label, "\n")
   
   data.frame(
-    variable = names(final_means),
-    mean     = round(final_means, 4),
-    se       = round(final_se, 4),
+    variable  = names(final_means),
+    mean      = round(final_means, 4),
+    se        = round(final_se, 4),
     row.names = NULL
   )
 }
 
-# Run for Norway and Finland 2012
-means_se_nor_12 <- compute_pooled_means_with_se_12(
-  imp_datasets_nor_12, final_cont_preds_12, "Norway 2012"
-)
+means_se_nor_12 <- compute_pooled_means_with_se_12(imp_datasets_nor_12,
+                                                   final_cont_preds_12,
+                                                   "Norway 2012")
+means_se_fin_12 <- compute_pooled_means_with_se_12(imp_datasets_fin_12,
+                                                   final_cont_preds_12,
+                                                   "Finland 2012")
 
-means_se_fin_12 <- compute_pooled_means_with_se_12(
-  imp_datasets_fin_12, final_cont_preds_12, "Finland 2012"
-)
-
-cat("\n--- Pooled means with SEs: Norway 2012 ---\n")
-print(means_se_nor_12)
-
-cat("\n--- Pooled means with SEs: Finland 2012 ---\n")
-print(means_se_fin_12)
+cat("\n--- Pooled means with SEs: Norway 2012 ---\n");  print(means_se_nor_12)
+cat("\n--- Pooled means with SEs: Finland 2012 ---\n"); print(means_se_fin_12)
 
 write.csv(means_se_nor_12, "means_se_nor_2012.csv", row.names = FALSE)
 write.csv(means_se_fin_12, "means_se_fin_2012.csv", row.names = FALSE)
 
-cat("\nFiles saved: means_se_nor_2012.csv, means_se_fin_2012.csv\n")
+# ==============================================================================
+# End of script
+# ==============================================================================
