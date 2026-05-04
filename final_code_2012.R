@@ -1623,23 +1623,21 @@ cat("\n--- Pooled regression results: Finland 2012 ---\n")
 print(reg_results_fin_12)
 
 # ==============================================================================
-# 12. Pooled weighted means with standard errors
+# 12. Pooled weighted means with standard errors and significance
 # ==============================================================================
-#
-# Produces pooled point estimates and their standard errors for each predictor
-# and for the math outcome, separately for Norway and Finland.
 
 # Pooling structure mirrors the regression analysis in Section 11:
 #   Stage 1 — Rubin's rules within each PV, using BRR design-based SEs.
 #   Stage 2 — PV combination rules across the Q pooled per-PV estimates.
 
 # ------------------------------------------------------------------------------
-# 12.1  Compute pooled means with SEs
+# 12.1  Compute pooled means with SEs and against-zero significance
 # ------------------------------------------------------------------------------
 
-compute_pooled_means_12 <- function(imp_datasets, cont_preds, label) {
+compute_pooled_means_12 <- function(imp_datasets, cont_preds,
+                                    country_label, cycle_label = 2012) {
   
-  cat("\n--- Computing pooled means with SEs:", label, "---\n")
+  cat("\n--- Computing pooled means with SEs:", country_label, cycle_label, "---\n")
   
   Q <- length(imp_datasets)
   m <- length(imp_datasets[[1]])
@@ -1653,12 +1651,10 @@ compute_pooled_means_12 <- function(imp_datasets, cont_preds, label) {
     imp_means <- matrix(NA, nrow = m, ncol = length(cont_preds) + 3)
     imp_ses   <- matrix(NA, nrow = m, ncol = length(cont_preds) + 3)
     
-    # Single pass: collect both point estimates and BRR-based SEs from each imputation
     for (j in seq_len(m)) {
       dat    <- imp_datasets[[i]][[j]]
       design <- make_brr_design_12_imp(dat)
       
-      # Continuous predictor means + SEs
       cont_obj         <- svymean(
         as.formula(paste("~", paste(cont_preds, collapse = " + "))),
         design, na.rm = TRUE
@@ -1666,12 +1662,10 @@ compute_pooled_means_12 <- function(imp_datasets, cont_preds, label) {
       cont_est         <- as.numeric(cont_obj)
       names(cont_est)  <- cont_preds
       
-      # LANGN means + SEs
       langn_obj        <- svymean(~ LANGN, design, na.rm = TRUE)
       langn_est        <- as.numeric(langn_obj)
       names(langn_est) <- names(coef(langn_obj))
       
-      # Outcome mean + SE
       pv_obj           <- svymean(~ PV_MATH, design, na.rm = TRUE)
       pv_est           <- as.numeric(pv_obj)
       names(pv_est)    <- "PV_MATH"
@@ -1711,40 +1705,40 @@ compute_pooled_means_12 <- function(imp_datasets, cont_preds, label) {
   total_var   <- avg_pv_var + (1 + 1/Q) * between_var
   final_se    <- sqrt(total_var)
   
-  cat("Done —", label, "\n")
+  # Against-zero significance test (H0: mean = 0)
+  t_val <- final_means / final_se
+  p_val <- 2 * pnorm(-abs(t_val))
+  
+  cat("Done —", country_label, cycle_label, "\n")
   
   data.frame(
-    variable  = names(final_means),
-    mean      = round(final_means, 4),
-    se        = round(final_se,    4),
-    row.names = NULL
+    cycle       = cycle_label,
+    country     = country_label,
+    variable    = names(final_means),
+    mean        = round(final_means, 4),
+    se          = round(final_se,    4),
+    t_value     = round(t_val,       3),
+    p_value     = signif(p_val,      3),
+    significant = ifelse(p_val < 0.05, "*", ""),
+    row.names   = NULL
   )
 }
 
-means_se_nor_12 <- compute_pooled_means_12(imp_datasets_nor_12,
-                                           final_cont_preds_12,
-                                           "Norway 2012")
-means_se_fin_12 <- compute_pooled_means_12(imp_datasets_fin_12,
-                                           final_cont_preds_12,
-                                           "Finland 2012")
+means_results_nor_12 <- compute_pooled_means_12(imp_datasets_nor_12,
+                                                final_cont_preds_12,
+                                                country_label = "NOR")
+means_results_fin_12 <- compute_pooled_means_12(imp_datasets_fin_12,
+                                                final_cont_preds_12,
+                                                country_label = "FIN")
 
-cat("\n--- Pooled means with SEs: Norway 2012 ---\n");  print(means_se_nor_12)
-cat("\n--- Pooled means with SEs: Finland 2012 ---\n"); print(means_se_fin_12)
+means_table_12 <- rbind(means_results_nor_12, means_results_fin_12)
 
 # ------------------------------------------------------------------------------
-# 12.3  Export
+# 12.2  Export
 # ------------------------------------------------------------------------------
 
-means_table_12 <- data.frame(
-  variable = means_se_nor_12$variable,
-  mean_NOR = means_se_nor_12$mean,
-  se_NOR   = means_se_nor_12$se,
-  mean_FIN = means_se_fin_12$mean,
-  se_FIN   = means_se_fin_12$se,
-  row.names = NULL
-)
-write.csv(reg_results_12, "reg_results_2012.csv",  row.names = FALSE)
-write.csv(means_table_12, "means_table_2012.csv",  row.names = FALSE)
+write.csv(reg_results_12,   "reg_results_2012.csv",   row.names = FALSE)
+write.csv(means_table_12, "means_table_2012.csv", row.names = FALSE)
 
 # ==============================================================================
 # End of script
