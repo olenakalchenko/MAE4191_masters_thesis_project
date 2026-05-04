@@ -15,8 +15,8 @@ PISA 2022 analysis workflow:
 0. Packages and session info
 1. Load data
 2. Variable selection and country subsetting
-  2.1  Define column groups
-  2.2  Subset by country
+  - Define column groups
+  - Subset by country
 3. Recoding
   3.0  Candidate-variable inspection before recoding
   3.1  Strip SPSS labels and recode missing-value sentinel codes to NA
