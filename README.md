@@ -1,5 +1,5 @@
 # MAE4191_masters_thesis_project
-MAE4191 Master's Thesis
+**MAE4191 Master's Thesis**
 
 This repository contains the code and materials needed to reproduce the analyses for the master’s thesis. The Oaxaca–Blinder decomposition (OBD) was performed in Excel using processed outputs from R (see file: OBD).
 
@@ -9,7 +9,7 @@ This repository contains the code and materials needed to reproduce the analyses
    - OBD – Oaxaca–Blinder decomposition calculations
 
 **Analytical Workflow Overview**
-   The analytical procedure follows the same conceptual structure for both datasets, with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
+The analytical procedure follows the same conceptual structure for both datasets, with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
 
 **PISA 2022 analysis workflow:**
 0. Packages and session info
