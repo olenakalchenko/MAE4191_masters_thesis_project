@@ -17,28 +17,28 @@ PISA 2022 analysis workflow:
 2. Variable selection and country subsetting
   2.1  Define column groups
   2.2  Subset by country
-3. Recoding
+4. Recoding
   3.0  Candidate-variable inspection before recoding
   3.1  Strip SPSS labels and recode missing-value sentinel codes to NA
   3.2  Post-cleaning validation
   3.3  Recode LANGN to a binary factor
   3.4  Recode IMMIG to a three-level factor
-4. IMMIG vs LANGN — diagnostic comparison
-5. PSU structure and stratum filtering
-6. Build BRR survey designs
-7. Missingness analysis
+5. IMMIG vs LANGN — diagnostic comparison
+6. PSU structure and stratum filtering
+7. Build BRR survey designs
+8. Missingness analysis
   7.1  Weighted missingness per predictor
   7.2  Complete-case summary (unweighted and weighted)
   7.3  MAR plausibility — survey-weighted logistic regressions of missingness
   7.4  Group differences in missingness (optional descriptive diagnostics)
   7.5  Little's MCAR test (supplementary, unweighted)
-8. Pre-imputation predictor screening
+9. Pre-imputation predictor screening
   8.1  Weighted predictor–math correlations (averaged across PVs)
   8.2  Weighted inter-predictor correlation matrix
   8.3  VIF (unweighted, diagnostic only)
   8.4  Country-level entirely-missing check
-9. Final predictor set
-10. Multiple imputation (MICE)
+10. Final predictor set
+11. Multiple imputation (MICE)
   10.1  Build predictor matrix and method vector
   10.2  Build PV-specific datasets
   10.3  Test runs (small m, maxit) — confirms config before full execution
@@ -46,14 +46,14 @@ PISA 2022 analysis workflow:
   10.5  Full imputation — Finland (10 PVs × m = 20)
   10.6  Validate imputations
   10.7  Extract imputed datasets
-11. Pooled regression analysis  
+12. Pooled regression analysis  
   11.1  Helper functions
   11.2  Add replicate weights to imputed datasets
   11.3  Regression formula and BRR design builder
   11.4  Two-stage pooling
   11.5  Format regression results
-12. Pooled weighted means (point estimates for OBD)  
-13. Pooled means with standard errors (for cross-cycle inference)
+13. Pooled weighted means (point estimates for OBD)  
+14. Pooled means with standard errors (for cross-cycle inference)
 
 PISA 2012 analysis workflow:
 0. Packages and session info
