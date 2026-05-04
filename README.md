@@ -3,15 +3,15 @@ MAE4191 Master's Thesis
 
 This repository contains the code and materials needed to reproduce the analyses for the master’s thesis. The Oaxaca–Blinder decomposition (OBD) was performed in Excel using processed outputs from R (see file: OBD).
 
-Files:
-final_code_2022.R – Full analysis pipeline for PISA 2022
-final_code_2012.R – Full analysis pipeline for PISA 2012
-OBD — Oaxaca–Blinder decomposition calculations
+**Files:**
+   - final_code_2022.R – Full analysis pipeline for PISA 2022
+   - final_code_2012.R – Full analysis pipeline for PISA 2012
+   - OBD – Oaxaca–Blinder decomposition calculations
 
-Analytical Workflow Overview
-The analytical procedure follows the same conceptual structure for both datasets, with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
+**Analytical Workflow Overview**
+   The analytical procedure follows the same conceptual structure for both datasets, with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
 
-PISA 2022 analysis workflow:
+**PISA 2022 analysis workflow:**
 0. Packages and session info
 1. Load data
 2. Variable selection and country subsetting
@@ -56,7 +56,7 @@ PISA 2022 analysis workflow:
     - Compute pooled means with SEs and against-zero significance
     - Export
 
-PISA 2012 analysis workflow:
+**PISA 2012 analysis workflow:**
 0. Packages and session info
 1. Load data
    - Load PISA 2012 Student Questionnaire
@@ -101,12 +101,12 @@ PISA 2012 analysis workflow:
     - Compute pooled means with SEs and against-zero significance
     - Export
 
-Notes on Reproducibility:
-All analyses rely on publicly available PISA datasets:
-PISA 2012 Database
-PISA 2022 Database
-The code assumes access to raw SPSS (.sav) files and auxiliary files (e.g., escs_trend.csv)
-File paths may need to be adjusted depending on the local environment
+**Notes on Reproducibility:**
+   All analyses rely on publicly available PISA datasets:
+   PISA 2012 Database
+   PISA 2022 Database
+   The code assumes access to raw SPSS (.sav) files and auxiliary files (e.g., escs_trend.csv)
+   File paths may need to be adjusted depending on the local environment
 
-Contact
-For questions regarding the code or analytical approach, contact the author.
+**Contact**
+   For questions regarding the code or analytical approach, contact the author.
