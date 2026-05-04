@@ -39,19 +39,19 @@ PISA 2022 analysis workflow:
    - Country-level entirely-missing check
 9. Final predictor set
 10. Multiple imputation (MICE)
-   - Build predictor matrix and method vector
-   - Build PV-specific datasets
-   - Test runs (small m, maxit) — confirms config before full execution
-   - Full imputation — Norway (10 PVs × m = 20)
-   - Full imputation — Finland (10 PVs × m = 20)
-   - Validate imputations
-   - Extract imputed datasets
+    - Build predictor matrix and method vector
+    - Build PV-specific datasets
+    - Test runs (small m, maxit) — confirms config before full execution
+    - Full imputation — Norway (10 PVs × m = 20)
+    - Full imputation — Finland (10 PVs × m = 20)
+    - Validate imputations
+    - Extract imputed datasets
 11. Pooled regression analysis
-   - Helper functions
-   - Add replicate weights to imputed datasets
-   - Regression formula and BRR design builder
-   - Two-stage pooling
-   - Format regression results
+    - Helper functions
+    - Add replicate weights to imputed datasets
+    - Regression formula and BRR design builder
+    - Two-stage pooling
+    - Format regression results
 12. Pooled weighted means (point estimates for OBD)  
 13. Pooled means with standard errors (for cross-cycle inference)
 
@@ -85,17 +85,17 @@ PISA 2012 analysis workflow:
    - Country-level entirely-missing check
 9. Final predictor set
 10. Multiple imputation (MICE)
-   - Helper functions for MI pipeline
-   - Configuration — Branch A (with QuestID as auxiliary predictor)
-   - Configuration — Branch B (without QuestID)
-   - Run both MI branches
-   - Compare branches and select final imputed datasets
+    - Helper functions for MI pipeline
+    - Configuration — Branch A (with QuestID as auxiliary predictor)
+    - Configuration — Branch B (without QuestID)
+    - Run both MI branches
+    - Compare branches and select final imputed datasets
 11. Pooled regression analysis
-   - Helper functions
-   - Add replicate weights to imputed datasets
-   - Regression formula and BRR design builder
-   - Two-stage pooling
-   - Format regression results
+    - Helper functions
+    - Add replicate weights to imputed datasets
+    - Regression formula and BRR design builder
+    - Two-stage pooling
+    - Format regression results
 12. Pooled weighted means (point estimates for OBD)
 13. Pooled means with standard errors (for cross-cycle inference)
 
