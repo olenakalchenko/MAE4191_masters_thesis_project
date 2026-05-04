@@ -8,7 +8,7 @@ This repository contains the code and materials needed to reproduce the analyses
    - final_code_2012.R – Full analysis pipeline for PISA 2012
    - OBD – Oaxaca–Blinder decomposition calculations
 
-**Analytical Workflow Overview**
+**Analytical Workflow Overview:**
 The analytical procedure follows the same conceptual structure for both datasets, with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
 
 **PISA 2022 analysis workflow:**
@@ -101,12 +101,6 @@ The analytical procedure follows the same conceptual structure for both datasets
     - Compute pooled means with SEs and against-zero significance
     - Export
 
-**Notes on Reproducibility:**
-   All analyses rely on publicly available PISA datasets:
-   PISA 2012 Database
-   PISA 2022 Database
-   The code assumes access to raw SPSS (.sav) files and auxiliary files (e.g., escs_trend.csv)
-   File paths may need to be adjusted depending on the local environment
+**Notes on Reproducibility:** All analyses rely on publicly available PISA datasets. The code assumes access to raw SPSS (.sav) files and auxiliary files (e.g., escs_trend.csv). File paths may need to be adjusted depending on the local environment
 
-**Contact**
-   For questions regarding the code or analytical approach, contact the author.
+**Contact:** For questions regarding the code or analytical approach, contact the author.
