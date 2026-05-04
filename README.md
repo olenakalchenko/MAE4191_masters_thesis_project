@@ -11,7 +11,8 @@ This repository contains the code and materials needed to reproduce the analyses
 **Analytical Workflow Overview:**
 The analytical procedure follows the same conceptual structure for both datasets with necessary adjustments due to differences in PISA design (e.g., number of plausible values, variable availability, and scaling).
 
-**PISA 2022 analysis workflow:**  
+**PISA 2022 analysis workflow:**
+
 0. Packages and session info
 1. Load data
 2. Variable selection and country subsetting
