@@ -4,8 +4,8 @@ MAE4191 Master's Thesis
 This repository contains the code and materials needed to reproduce the analyses for the master’s thesis. The Oaxaca–Blinder decomposition (OBD) was performed in Excel using processed outputs from R (see file: OBD).
 
 Files:
-final_code_2022.R — Full analysis pipeline for PISA 2022
-final_code_2012.R — Full analysis pipeline for PISA 2012
+final_code_2022.R – Full analysis pipeline for PISA 2022
+final_code_2012.R – Full analysis pipeline for PISA 2012
 OBD — Oaxaca–Blinder decomposition calculations
 
 Analytical Workflow Overview
@@ -23,13 +23,13 @@ PISA 2022 analysis workflow:
    - Post-cleaning validation
    - Recode LANGN to a binary factor
    - Recode IMMIG to a three-level factor
-4. IMMIG vs LANGN — diagnostic comparison
+4. IMMIG vs LANGN – diagnostic comparison
 5. PSU structure and stratum filtering
 6. Build BRR survey designs
 7. Missingness analysis
    - Weighted missingness per predictor
    - Complete-case summary (unweighted and weighted)
-   - MAR plausibility — survey-weighted logistic regressions of missingness
+   - MAR plausibility – survey-weighted logistic regressions of missingness
    - Group differences in missingness (optional descriptive diagnostics)
    - Little's MCAR test (supplementary, unweighted)
 8. Pre-imputation predictor screening
@@ -41,9 +41,9 @@ PISA 2022 analysis workflow:
 10. Multiple imputation (MICE)
     - Build predictor matrix and method vector
     - Build PV-specific datasets
-    - Test runs (small m, maxit) — confirms config before full execution
-    - Full imputation — Norway (10 PVs × m = 20)
-    - Full imputation — Finland (10 PVs × m = 20)
+    - Test runs (small m, maxit) – confirms config before full execution
+    - Full imputation – Norway (10 PVs × m = 20)
+    - Full imputation – Finland (10 PVs × m = 20)
     - Validate imputations
     - Extract imputed datasets
 11. Pooled regression analysis
@@ -52,8 +52,9 @@ PISA 2022 analysis workflow:
     - Regression formula and BRR design builder
     - Two-stage pooling
     - Format regression results
-12. Pooled weighted means (point estimates for OBD)  
-13. Pooled means with standard errors (for cross-cycle inference)
+12. Pooled weighted means
+    - Compute pooled means with SEs and against-zero significance
+    - Export
 
 PISA 2012 analysis workflow:
 0. Packages and session info
@@ -70,24 +71,24 @@ PISA 2012 analysis workflow:
    - Recode LANGN to a binary factor
    - Recode IMMIG to a three-level factor
    - Recode QuestID (booklet-form indicator, 2012-specific)
-4. IMMIG vs LANGN — diagnostic comparison
+4. IMMIG vs LANGN – diagnostic comparison
 5. PSU structure and stratum filtering
 6. Build BRR survey designs
 7. Missingness analysis
    - Weighted missingness per predictor
    - Booklet-aware missingness diagnostic (2012-specific)
    - Complete-case summary (unweighted and weighted)
-   - MAR plausibility — survey-weighted logistic regressions of missingness
+   - MAR plausibility – survey-weighted logistic regressions of missingness
    - Little's MCAR test (supplementary, unweighted)
 8. Pre-imputation predictor screening
    - Weighted inter-predictor correlation matrix
-   - VIF (unweighted, diagnostic only) — booklet-aware
+   - VIF (unweighted, diagnostic only) – booklet-aware
    - Country-level entirely-missing check
 9. Final predictor set
 10. Multiple imputation (MICE)
     - Helper functions for MI pipeline
-    - Configuration — Branch A (with QuestID as auxiliary predictor)
-    - Configuration — Branch B (without QuestID)
+    - Configuration – Branch A (with QuestID as auxiliary predictor)
+    - Configuration – Branch B (without QuestID)
     - Run both MI branches
     - Compare branches and select final imputed datasets
 11. Pooled regression analysis
@@ -96,8 +97,9 @@ PISA 2012 analysis workflow:
     - Regression formula and BRR design builder
     - Two-stage pooling
     - Format regression results
-12. Pooled weighted means (point estimates for OBD)
-13. Pooled means with standard errors (for cross-cycle inference)
+12. Pooled weighted means
+    - Compute pooled means with SEs and against-zero significance
+    - Export
 
 Notes on Reproducibility:
 All analyses rely on publicly available PISA datasets:
